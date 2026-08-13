@@ -1,0 +1,14 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.exe binary
+*.zip binary
+*.7z binary
+
+# 将来如增加 Windows 原生命令脚本，检出时使用 CRLF。
+*.bat text eol=crlf
+*.cmd text eol=crlf

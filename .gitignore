@@ -1,0 +1,15 @@
+node_modules/
+dist/
+out/
+release/
+playwright-report/
+test-results/
+coverage/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# gstack 的运行输出留在本机；冻结验收证据放在 evidence/qa/。
+.gstack/

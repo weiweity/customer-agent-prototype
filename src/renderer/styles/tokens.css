@@ -1,0 +1,83 @@
+:root {
+  --canvas: #f3f5f4;
+  --surface: #ffffff;
+  --surface-subtle: #eaf0ee;
+  --ink: #17201d;
+  --muted: #5d6a65;
+  --border: #d6deda;
+  --accent: #0e766e;
+  --accent-hover: #095f59;
+  --focus: #1d63d5;
+  --success: #16794f;
+  --warning: #a66313;
+  --danger: #b93838;
+  --radius-badge: 5px;
+  --radius-control: 8px;
+  --radius-card: 10px;
+  --shadow-toast: 0 8px 20px rgba(23, 32, 29, 0.12);
+  --font-body: 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif;
+  --font-meta: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', 'Noto Sans SC',
+    'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Cascadia Mono', 'Segoe UI Mono', 'SFMono-Regular', Menlo,
+    Consolas, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+textarea,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
