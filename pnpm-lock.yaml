@@ -43,8 +43,8 @@ importers:
         specifier: ^4.7.0
         version: 4.7.0(supports-color@7.1.0)(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0))
       electron:
-        specifier: ^37.4.0
-        version: 37.4.0(supports-color@7.1.0)
+        specifier: ^39.8.10
+        version: 39.8.10(supports-color@7.1.0)
       electron-builder:
         specifier: ^26.0.12
         version: 26.15.3(electron-builder-squirrel-windows@26.15.3)(supports-color@7.1.0)
@@ -1463,8 +1463,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@37.4.0:
-    resolution: {integrity: sha512-HhsSdWowE5ODOeWNc/323Ug2C52mq/TqNBG+4uMeOA3G2dMXNc/nfyi0RYu1rJEgiaJLEjtHveeZZaYRYFsFCQ==}
+  electron@39.8.10:
+    resolution: {integrity: sha512-zbYtGPYUI7PzqLAzkk21Rk6j67WN0hxn0Mq/njErZo1d0HSf33is4f8ICI5fMLy5vYe0JtCtM5sYunNOaochSQ==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -4220,7 +4220,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@37.4.0(supports-color@7.1.0):
+  electron@39.8.10(supports-color@7.1.0):
     dependencies:
       '@electron/get': 2.0.0(supports-color@7.1.0)
       '@types/node': 22.20.1
