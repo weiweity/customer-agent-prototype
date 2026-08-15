@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ElectronApplication, type Page, _electron as electron } from '@playwright/test';
@@ -28,15 +29,25 @@ if (!cleanser || !cleanserSecond) {
 }
 
 async function launchApp(): Promise<ElectronApplication> {
-  return electron.launch({
-    cwd: repoRoot,
-    args: [mainEntry, '--demo-e2e'],
-    env: {
-      ...process.env,
-      DEMO_E2E: '1',
-    },
-    timeout: 60_000,
-  });
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-agent-demo-e2e-'));
+  try {
+    const app = await electron.launch({
+      cwd: repoRoot,
+      args: [`--user-data-dir=${userDataDir}`, mainEntry, '--demo-e2e'],
+      env: {
+        ...process.env,
+        DEMO_E2E: '1',
+      },
+      timeout: 60_000,
+    });
+    app.process().once('exit', () => {
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+    });
+    return app;
+  } catch (error) {
+    fs.rmSync(userDataDir, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 async function waitForRole(

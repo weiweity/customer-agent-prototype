@@ -25,12 +25,14 @@ export PATH="$HOME/homebrew/opt/node@24/bin:$HOME/homebrew/bin:$PATH"
 hash -r
 node -v    # 应为 v24.x
 pnpm -v    # 项目锁定 11.19.0
+export NODE_OPTIONS=--use-system-ca
 export NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem
 pnpm install --frozen-lockfile
+pnpm exec install-electron
 pnpm dev
 ```
 
-上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_EXTRA_CA_CERTS` 用于当前企业证书环境，禁止关闭 TLS 验证。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。
+上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 用于当前企业证书环境，禁止关闭 TLS 验证。Electron 42 起不再在依赖安装阶段自动下载桌面运行时，因此用 `pnpm exec install-electron` 显式准备运行时；后续启动也会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。
 
 ## 交互
 
