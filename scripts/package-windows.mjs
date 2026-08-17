@@ -16,20 +16,31 @@ const buildEnvironment = {
   CSC_IDENTITY_AUTO_DISCOVERY: 'false',
 };
 
-execFileSync('pnpm', ['build'], {
+execFileSync(process.execPath, ['scripts/generate-app-icons.mjs'], {
   cwd: root,
   env: buildEnvironment,
   stdio: 'inherit',
 });
 
 execFileSync(
-  'electron-builder',
+  process.execPath,
+  ['node_modules/electron-vite/bin/electron-vite.js', 'build'],
+  {
+    cwd: root,
+    env: buildEnvironment,
+    stdio: 'inherit',
+  },
+);
+
+execFileSync(
+  process.execPath,
   [
+    'node_modules/electron-builder/out/cli/cli.js',
     '--win',
     '--publish',
     'never',
     `-c.directories.output=${outputDirectory}`,
-    '-c.win.signAndEditExecutable=false',
+    '-c.win.signExecutable=false',
     '-c.win.artifactName=${productName}-${version}-win-${arch}-UNSIGNED.${ext}',
   ],
   {

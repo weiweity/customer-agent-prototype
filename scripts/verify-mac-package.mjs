@@ -50,7 +50,20 @@ for (const relativePath of [
   }
 }
 
+const iconFile = execFileSync('/usr/bin/plutil', ['-extract', 'CFBundleIconFile', 'raw', infoPlist], {
+  encoding: 'utf8',
+}).trim();
+if (!iconFile.includes('icon') && !iconFile.endsWith('.icns') && iconFile !== 'electron.icns') {
+  throw new Error(`CFBundleIconFile is missing a brand icon: ${iconFile}`);
+}
+const resourcesIcon = path.join(appPath, 'Contents', 'Resources', iconFile.endsWith('.icns') ? iconFile : `${iconFile}.icns`);
+if (!existsSync(resourcesIcon) && !existsSync(path.join(appPath, 'Contents', 'Resources', 'icon.icns'))) {
+  throw new Error('Packaged macOS resources must include icon.icns');
+}
+
 for (const forbiddenKey of [
+  'LSUIElement',
+  'LSBackgroundOnly',
   'NSAppTransportSecurity',
   'NSAudioCaptureUsageDescription',
   'NSBluetoothAlwaysUsageDescription',

@@ -11,7 +11,10 @@ const packageJson = JSON.parse(
   build: {
     directories: { output: string };
     win: {
-      signAndEditExecutable: boolean;
+      icon: string;
+      extraResources: Array<{ from: string; to: string }>;
+      signExecutable: boolean;
+      signAndEditExecutable?: boolean;
       artifactName: string;
       certificateFile?: string;
       certificateSha1?: string;
@@ -26,15 +29,26 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(packageJson.scripts['package:win']).toBe('node scripts/package-windows.mjs local');
     expect(packageJson.scripts['package:win:distribution']).toBeUndefined();
     expect(packageJson.build.directories.output).toBe('release');
-    expect(packageJson.build.win.signAndEditExecutable).toBe(false);
+    expect(packageJson.build.win.icon).toBe('build/icon.ico');
+    expect(packageJson.build.win.signExecutable).toBe(false);
+    expect(packageJson.build.win.signAndEditExecutable).toBeUndefined();
+    expect(packageJson.build.win.extraResources).toContainEqual({
+      from: 'build/icon.ico',
+      to: 'icon.ico',
+    });
     expect(packageJson.build.win.certificateFile).toBeUndefined();
     expect(packageJson.build.win.certificateSha1).toBeUndefined();
     expect(packageJson.build.win.artifactName).toContain('-UNSIGNED.');
 
+    expect(packageWindows).toContain('scripts/generate-app-icons.mjs');
+    expect(packageWindows).toContain("node_modules/electron-vite/bin/electron-vite.js");
+    expect(packageWindows).toContain("node_modules/electron-builder/out/cli/cli.js");
+    expect(packageWindows).not.toMatch(/execFileSync\(['"](?:pnpm|electron-builder)['"]/);
     expect(packageWindows).toContain("'release/local-unsigned'");
     expect(packageWindows).toContain("CSC_IDENTITY_AUTO_DISCOVERY: 'false'");
     expect(packageWindows).toContain('-UNSIGNED.${ext}');
-    expect(packageWindows).toContain('-c.win.signAndEditExecutable=false');
+    expect(packageWindows).toContain('-c.win.signExecutable=false');
+    expect(packageWindows).not.toContain('signAndEditExecutable');
     expect(packageWindows).toContain('local-unsigned only');
     expect(packageWindows).not.toContain('release/distribution');
     expect(packageWindows).not.toMatch(/signtool|osslsigncode|Authenticode|EV certificate/i);

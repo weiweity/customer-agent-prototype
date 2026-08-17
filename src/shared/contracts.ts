@@ -1,4 +1,5 @@
 import type {
+  FoxDragSettleAck,
   FoxPeekIntent,
   FoxVisualTransform,
   HandoffMilestone,
@@ -7,6 +8,11 @@ import type {
 } from './overlay-events';
 import type { ReportablePhase, ResultCount } from './overlay-events';
 import type { CopyTextResult, PlatformInfo } from './contracts-types';
+import type {
+  QueryLayoutAck,
+  QueryLayoutRequest,
+  QueryResizeRequest,
+} from './query-layout';
 
 export type {
   CopyTextResult,
@@ -26,7 +32,13 @@ export type CustomerAgentApi = {
   dismiss: () => Promise<void>;
   reportUiPhase: (phase: ReportablePhase, resultCount?: ResultCount) => Promise<void>;
   reportHandoffMilestone?: (handoffId: number, milestone: HandoffMilestone) => Promise<void>;
-  moveFoxBy: (deltaX: number, deltaY: number, finished?: boolean) => Promise<void>;
+  reportQueryLayout?: (request: QueryLayoutRequest) => Promise<QueryLayoutAck>;
+  resizeQueryHeight?: (request: QueryResizeRequest) => Promise<QueryLayoutAck>;
+  moveFoxBy: (
+    deltaX: number,
+    deltaY: number,
+    finished?: boolean,
+  ) => Promise<FoxDragSettleAck | null>;
   setFoxPeek: (intent: FoxPeekIntent, epoch: number) => Promise<void>;
   onOverlayCommand: (handler: (command: OverlayCommand) => void) => () => void;
 };

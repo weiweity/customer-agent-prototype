@@ -36,7 +36,9 @@ function createActions(options: DesktopShellOptions): DesktopActions {
       options.controller.openSearch();
     },
     'open-dashboard': () => {
-      void options.controller.openDashboard();
+      void options.controller.openDashboard().catch((error: unknown) => {
+        console.error('[desktop-shell] 打开工作台失败。', error);
+      });
     },
     quit: options.quit,
   };

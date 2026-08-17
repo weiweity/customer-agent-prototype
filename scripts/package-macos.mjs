@@ -46,7 +46,7 @@ try {
     buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
   }
 
-  execFileSync('pnpm', ['generate:mac-icon'], {
+  execFileSync('pnpm', ['generate:app-icons'], {
     cwd: root,
     env: buildEnvironment,
     stdio: 'inherit',

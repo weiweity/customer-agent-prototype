@@ -4,7 +4,8 @@ import { FoxApp } from '../../src/renderer/FoxApp';
 import { QueryApp } from '../../src/renderer/QueryApp';
 import { splitDragDelta } from '../../src/renderer/lib/use-window-drag';
 import { FOX_RETRACT_DURATION_MS } from '../../src/shared/fox-motion';
-import type { OverlayCommand } from '../../src/shared/overlay-events';
+import { FOX_SLEEP_AFTER_MS } from '../../src/shared/fox-presence';
+import type { FoxDragSettleAck, OverlayCommand } from '../../src/shared/overlay-events';
 import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../../src/shared/overlay-events';
 
 const copyText = vi.fn();
@@ -30,6 +31,20 @@ function dispatchPointer(
   fireEvent(target, event);
 }
 
+function dispatchClientPointer(
+  target: Element,
+  type: string,
+  init: { clientX: number; clientY: number },
+): void {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: init.clientX,
+    clientY: init.clientY,
+  });
+  fireEvent(target, event);
+}
+
 function dispatchAnimationEnd(target: Element, animationName: string): void {
   const event = new Event('animationend', { bubbles: true, cancelable: false });
   Object.defineProperty(event, 'animationName', { configurable: true, value: animationName });
@@ -47,6 +62,7 @@ describe('FoxApp', () => {
     dismiss.mockReset();
     reportUiPhase.mockReset();
     moveFoxBy.mockReset();
+    moveFoxBy.mockResolvedValue(null);
     setFoxPeek.mockReset();
     setFoxPeek.mockResolvedValue(undefined);
     getPlatform.mockResolvedValue({ platform: 'darwin' });
@@ -80,6 +96,27 @@ describe('FoxApp', () => {
     };
   });
 
+  it('uses a purple breathe halo that pauses for warning and handoff', () => {
+    render(<FoxApp />);
+    const idle = screen.getByTestId('fox-idle');
+    expect(idle).toHaveAttribute('data-halo', 'purple-breathe');
+    expect(idle).not.toHaveClass('is-halo-paused');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'shortcut-status',
+          registered: false,
+          accelerator: 'CommandOrControl+Shift+Space',
+          message: '快捷键不可用',
+        });
+      }
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-halo', 'paused');
+    expect(screen.getByTestId('fox-idle')).toHaveClass('is-halo-paused');
+    expect(screen.getByTestId('shortcut-fallback-dot')).toBeInTheDocument();
+  });
+
   it('opens search on a click that is not a drag', async () => {
     render(<FoxApp />);
     fireEvent.pointerDown(screen.getByTestId('fox-button'), {
@@ -93,12 +130,14 @@ describe('FoxApp', () => {
     });
     expect(openSearch).toHaveBeenCalledWith(IDENTITY_FOX_VISUAL_TRANSFORM);
     expect(screen.getByTestId('fox-idle')).toHaveClass('is-handoff-frozen');
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-halo', 'paused');
     act(() => {
       for (const listener of commandListeners) {
         listener({ type: 'fox-edge', edge: 'none', epoch: 1 });
       }
     });
     expect(screen.getByTestId('fox-idle')).not.toHaveClass('is-handoff-frozen');
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-halo', 'purple-breathe');
     expect(moveFoxBy).not.toHaveBeenCalled();
   });
 
@@ -326,6 +365,177 @@ describe('FoxApp', () => {
     expect(openSearch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['pointercancel', (fox: HTMLElement) => {
+      dispatchPointer(fox, 'pointercancel', { pointerId: 19 });
+    }],
+    ['lostpointercapture', (fox: HTMLElement) => {
+      dispatchPointer(fox, 'lostpointercapture', { pointerId: 19 });
+    }],
+    ['blur', () => {
+      window.dispatchEvent(new Event('blur'));
+    }],
+    ['buttons0', (fox: HTMLElement) => {
+      dispatchPointer(fox, 'pointermove', {
+        button: 0,
+        buttons: 0,
+        pointerId: 19,
+        screenX: 10,
+        screenY: 10,
+      });
+    }],
+  ] as const)(
+    'clears a dock drag session after %s before the movement threshold',
+    (_reason, finishGesture) => {
+      render(<FoxApp />);
+      const fox = screen.getByTestId('fox-button');
+      const idle = screen.getByTestId('fox-idle');
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'sync-fox-edge', edge: 'left', epoch: 18 });
+        }
+      });
+
+      dispatchPointer(fox, 'pointerdown', {
+        button: 0,
+        buttons: 1,
+        pointerId: 19,
+        screenX: 10,
+        screenY: 10,
+      });
+      expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+
+      act(() => {
+        finishGesture(fox);
+      });
+
+      expect(moveFoxBy).not.toHaveBeenCalled();
+      expect(idle).toHaveAttribute('data-fox-transient', 'none');
+      expect(idle).toHaveAttribute('data-fox-drag-session', 'none');
+      expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    },
+  );
+
+  it('finishes exactly once on pointercancel after the drag threshold and does not open search', () => {
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 27,
+      screenX: 20,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 27,
+      screenX: 48,
+      screenY: 24,
+    });
+    expect(idle).toHaveAttribute('data-fox-pose', 'dragging');
+    expect(moveFoxBy).toHaveBeenCalled();
+    const callsAfterMove = moveFoxBy.mock.calls.length;
+    dispatchPointer(fox, 'pointercancel', { pointerId: 27 });
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true);
+    expect(moveFoxBy.mock.calls.length).toBe(callsAfterMove + 1);
+    expect(openSearch).not.toHaveBeenCalled();
+    expect(idle).toHaveAttribute('data-fox-transient', 'none');
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 27,
+      screenX: 80,
+      screenY: 40,
+    });
+    expect(moveFoxBy).toHaveBeenCalledTimes(callsAfterMove + 1);
+    fireEvent.click(fox, { detail: 1 });
+    expect(openSearch).not.toHaveBeenCalled();
+  });
+
+  it('recovers a pending settle with a generation-guarded watchdog and ignores a stale ACK', async () => {
+    vi.useFakeTimers();
+    let resolveStale: ((ack: FoxDragSettleAck | null) => void) | null = null;
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>((resolve) => {
+        resolveStale = resolve;
+      });
+    });
+    try {
+      render(<FoxApp />);
+      const fox = screen.getByTestId('fox-button');
+      const idle = screen.getByTestId('fox-idle');
+      dispatchPointer(fox, 'pointerdown', {
+        button: 0,
+        buttons: 1,
+        pointerId: 28,
+        screenX: 20,
+        screenY: 20,
+      });
+      dispatchPointer(fox, 'pointermove', {
+        button: 0,
+        buttons: 1,
+        pointerId: 28,
+        screenX: 50,
+        screenY: 28,
+      });
+      act(() => {
+        dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 28, screenX: 50, screenY: 28 });
+      });
+      expect(idle).toHaveAttribute('data-fox-settling', 'true');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1600);
+      });
+      expect(idle).toHaveAttribute('data-fox-settling', 'false');
+      act(() => {
+        resolveStale?.({ edge: 'right', epoch: 44, openSearchRequested: true });
+      });
+      expect(idle).toHaveAttribute('data-dock-edge', 'none');
+      expect(openSearch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not fall asleep after being hidden and restarts the clock when visible again', () => {
+    vi.useFakeTimers();
+    try {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      });
+      render(<FoxApp />);
+      const idle = screen.getByTestId('fox-idle');
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'hidden',
+      });
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      act(() => {
+        vi.advanceTimersByTime(14_000);
+      });
+      expect(idle).toHaveAttribute('data-fox-pose', 'idle');
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      });
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      expect(idle).toHaveAttribute('data-fox-pose', 'idle');
+      act(() => {
+        vi.advanceTimersByTime(8_000);
+      });
+      expect(idle).toHaveAttribute('data-fox-pose', 'drowsy');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('splits a fast drag into safe bounded movement events', () => {
     const chunks = splitDragDelta(600, -300);
     expect(chunks).toHaveLength(3);
@@ -496,6 +706,10 @@ describe('FoxApp', () => {
     expect(idle).toHaveAttribute('data-idle-float-px', '4');
     expect(idle).toHaveAttribute('data-idle-swing-deg', '2');
     expect(idle).toHaveAttribute('data-idle-max-scale', '1.04');
+    expect(idle).toHaveAttribute('data-dock-ready-travel-px', '3');
+    expect(idle).toHaveAttribute('data-dock-ready-rise-px', '2');
+    expect(idle).toHaveAttribute('data-dock-ready-tilt-deg', '5');
+    expect(idle).toHaveAttribute('data-dock-ready-max-scale', '1.035');
     expect(idle).toHaveAttribute('data-snap-duration-ms', '480');
     expect(idle).toHaveAttribute('data-peek-duration-ms', '420');
     expect(idle).toHaveAttribute('data-retract-duration-ms', '300');
@@ -619,7 +833,7 @@ describe('FoxApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true, handoffCenterX: 44, handoffCenterY: 44 });
       }
     });
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-closing', 'true');
@@ -631,10 +845,835 @@ describe('FoxApp', () => {
     act(() => {
       for (const listener of commandListeners) {
         listener({ type: 'activate-search', anchor: 'right', animate: false });
-        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: false });
+        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: false, handoffCenterX: 600, handoffCenterY: 44 });
       }
     });
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+  });
+
+  it('coalesces local whole-head follow into one rAF and resets on leave', () => {
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 88,
+      height: 88,
+      top: 0,
+      left: 0,
+      right: 88,
+      bottom: 88,
+      toJSON() {
+        return {};
+      },
+    } as DOMRect);
+
+    try {
+      render(<FoxApp />);
+      const idle = screen.getByTestId('fox-idle');
+      expect(idle).toHaveAttribute('data-fox-pose', 'idle');
+      expect(idle).toHaveAttribute('data-fox-ambient', 'awake');
+
+      dispatchClientPointer(idle, 'pointermove', { clientX: 72, clientY: 18 });
+      dispatchClientPointer(idle, 'pointermove', { clientX: 80, clientY: 8 });
+      expect(frames).toHaveLength(1);
+      act(() => {
+        frames[0](0);
+      });
+      const followX = Number.parseFloat(idle.style.getPropertyValue('--fox-follow-x'));
+      const followRot = Number.parseFloat(idle.style.getPropertyValue('--fox-follow-rot'));
+      expect(Math.abs(followX)).toBeLessThanOrEqual(1.75);
+      expect(Math.abs(followRot)).toBeLessThanOrEqual(2);
+      expect(followX).not.toBe(0);
+      expect(idle).toHaveAttribute('data-fox-follow', 'true');
+      expect(idle).toHaveAttribute('data-fox-ambient', 'following-local');
+      expect(idle).toHaveAttribute('data-fox-pose', 'following-local');
+      expect(idle).toHaveAttribute('data-fox-headset-signal', 'true');
+      expect(screen.getByTestId('fox-headset-signal')).toHaveAttribute('aria-hidden', 'true');
+
+      fireEvent.pointerLeave(idle);
+      expect(frames).toHaveLength(2);
+      act(() => {
+        frames[1](0);
+      });
+      expect(idle).toHaveAttribute('data-fox-follow', 'false');
+      expect(idle.style.getPropertyValue('--fox-follow-x')).toBe('');
+      expect(idle).toHaveAttribute('data-fox-pose', 'idle');
+      expect(idle).toHaveAttribute('data-fox-headset-signal', 'false');
+      expect(screen.queryByTestId('fox-headset-signal')).toBeNull();
+    } finally {
+      raf.mockRestore();
+    }
+  });
+
+  it('walks awake to drowsy to sleeping and cancels stale tokens on activity, fox-edge, open, and unmount', async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(<FoxApp />);
+      const idle = screen.getByTestId('fox-idle');
+      expect(idle).toHaveAttribute('data-fox-ambient', 'awake');
+
+      act(() => {
+        vi.advanceTimersByTime(7999);
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'awake');
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'drowsy');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'drowsy');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-expression', 'drowsy');
+      expect(screen.getByTestId('fox-expression-layer')).toHaveAttribute('data-expression-state', 'drowsy');
+      expect(screen.getByTestId('fox-expression-awake')).toBeInTheDocument();
+      expect(screen.getByTestId('fox-expression-drowsy')).toHaveAttribute('fill', 'none');
+      expect(screen.getByTestId('fox-expression-drowsy')).toHaveAttribute('stroke', '#A45C4A');
+      expect(screen.getByTestId('fox-expression-drowsy').querySelector('path')?.getAttribute('d') ?? '').toContain('Q29.7 49.35');
+      expect(screen.getByTestId('fox-expression-closed')).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(5999);
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'drowsy');
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'sleeping');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'sleeping');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-expression', 'closed');
+      expect(screen.getByTestId('fox-expression-layer')).toHaveAttribute('data-expression-state', 'closed');
+      expect(screen.getByTestId('fox-expression-closed')).toHaveAttribute('fill', 'none');
+      expect(screen.getByTestId('fox-expression-closed')).toHaveAttribute('stroke', '#A45C4A');
+      expect(screen.getByTestId('fox-expression-closed-lid')).toHaveAttribute('stroke-width', '1.7');
+      expect(screen.getByTestId('fox-expression-closed-lid').getAttribute('d') ?? '').toBe('M25 45.68 Q29.7 50.85 34.4 45.68');
+      expect(screen.getByTestId('fox-expression-closed-stem').getAttribute('d') ?? '').toBe('M29.7 48.62 L29.7 51.82');
+      expect(screen.getByTestId('fox-expression-layer').querySelector('.fox-expression-cover')).toHaveAttribute('fill', '#F9D6C5');
+      expect(screen.getByTestId('fox-sleep-mark')).toHaveTextContent('zZZ');
+      expect(screen.queryByTestId('fox-headset-signal')).toBeNull();
+      const shadow = screen.getByTestId('fox-ground-shadow');
+      const head = document.querySelector('.fox-head');
+      expect(head).not.toBeNull();
+      expect(head?.contains(shadow)).toBe(false);
+      expect(shadow.parentElement).toBe(screen.getByTestId('fox-button'));
+
+      fireEvent.focus(screen.getByTestId('fox-button'));
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'awake');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'idle');
+      expect(screen.getByTestId('fox-expression-layer')).toHaveAttribute('data-expression-state', 'awake');
+
+      act(() => {
+        vi.advanceTimersByTime(14000);
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'sleeping');
+
+      fireEvent.pointerMove(idle, { clientX: 20, clientY: 20 });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'awake');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'idle');
+
+      act(() => {
+        vi.advanceTimersByTime(8000);
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'drowsy');
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'fox-edge', edge: 'left', epoch: 41 });
+        }
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'awake');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'snap');
+
+      fireEvent.pointerDown(screen.getByTestId('fox-button'), {
+        button: 0,
+        buttons: 1,
+        pointerId: 21,
+        screenX: 10,
+        screenY: 10,
+      });
+      fireEvent.pointerUp(screen.getByTestId('fox-button'), {
+        button: 0,
+        pointerId: 21,
+        screenX: 10,
+        screenY: 10,
+      });
+      expect(openSearch).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'handoff');
+
+      unmount();
+      act(() => {
+        vi.advanceTimersByTime(20000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('consumes a one-shot wake headset pulse when a higher-priority snap interrupts it', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<FoxApp />);
+      act(() => {
+        vi.advanceTimersByTime(FOX_SLEEP_AFTER_MS);
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'sleeping');
+
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'fox-edge', edge: 'left', epoch: 71 });
+        }
+      });
+      const idle = screen.getByTestId('fox-idle');
+      expect(idle).toHaveAttribute('data-fox-structural', 'snap');
+      expect(idle).toHaveAttribute('data-fox-headset-signal', 'false');
+
+      const head = document.querySelector('.fox-head');
+      expect(head).not.toBeNull();
+      await act(async () => {
+        dispatchAnimationEnd(head as Element, 'fox-snap-left');
+        await Promise.resolve();
+      });
+      expect(idle).toHaveAttribute('data-fox-structural', 'none');
+      expect(idle).toHaveAttribute('data-fox-headset-signal', 'false');
+      expect(screen.queryByTestId('fox-headset-signal')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('applies press then directional drag and a one-shot annoyed-drag without delaying the first open', async () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+
+    fireEvent.pointerDown(fox, {
+      button: 0,
+      buttons: 1,
+      pointerId: 31,
+      screenX: 10,
+      screenY: 10,
+    });
+    expect(idle).toHaveAttribute('data-fox-transient', 'pressed');
+    expect(idle).toHaveAttribute('data-fox-pose', 'pressed');
+
+    fireEvent.pointerUp(fox, {
+      button: 0,
+      pointerId: 31,
+      screenX: 10,
+      screenY: 10,
+    });
+    await waitFor(() => {
+      expect(openSearch).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'sync-fox-edge', edge: 'left', epoch: 50 });
+      }
+    });
+    openSearch.mockClear();
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 32,
+      screenX: 10,
+      screenY: 10,
+    });
+    expect(idle).toHaveAttribute('data-fox-transient', 'pressed');
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 32,
+      screenX: 12,
+      screenY: 10,
+    });
+    expect(idle).toHaveAttribute('data-fox-transient', 'pressed');
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 32,
+      screenX: 48,
+      screenY: 8,
+    });
+    expect(idle).toHaveAttribute('data-fox-transient', 'dragging');
+    expect(idle).toHaveAttribute('data-fox-pose', 'dragging');
+    expect(idle).toHaveAttribute('data-fox-expression', 'strained');
+    expect(screen.getByTestId('fox-expression-layer')).toHaveAttribute('data-expression-state', 'strained');
+    expect(screen.getByTestId('fox-expression-strained')).toHaveAttribute('stroke', '#A45C4A');
+    expect(screen.queryByTestId('fox-headset-signal')).toBeNull();
+    act(() => {
+      frames.at(-1)?.(0);
+    });
+    expect(Number.parseFloat(idle.style.getPropertyValue('--fox-drag-rot'))).toBeGreaterThan(0);
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'none', epoch: 51 });
+      }
+    });
+    expect(idle).toHaveAttribute('data-fox-transient', 'dragging');
+    expect(idle).toHaveAttribute('data-fox-pose', 'dragging');
+    expect(idle.style.getPropertyValue('--fox-drag-rot')).not.toBe('');
+
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 32,
+      screenX: 220,
+      screenY: 8,
+    });
+    expect(idle).toHaveAttribute('data-fox-transient', 'annoyed-drag');
+    expect(idle).toHaveAttribute('data-fox-pose', 'annoyed-drag');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'sync-fox-edge', edge: 'none', epoch: 52 });
+      }
+    });
+    expect(idle).toHaveAttribute('data-fox-transient', 'annoyed-drag');
+    expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+    dispatchPointer(fox, 'pointerup', {
+      button: 0,
+      pointerId: 32,
+      screenX: 220,
+      screenY: 8,
+    });
+    expect(openSearch).not.toHaveBeenCalled();
+    expect(idle).toHaveAttribute('data-fox-transient', 'none');
+  });
+
+  it('enters annoyed-drag while held still and cancels the one-shot timer on release', () => {
+    vi.useFakeTimers();
+    try {
+      render(<FoxApp />);
+      const fox = screen.getByTestId('fox-button');
+      const idle = screen.getByTestId('fox-idle');
+
+      dispatchPointer(fox, 'pointerdown', {
+        button: 0,
+        buttons: 1,
+        pointerId: 33,
+        screenX: 10,
+        screenY: 10,
+      });
+      dispatchPointer(fox, 'pointermove', {
+        button: 0,
+        buttons: 1,
+        pointerId: 33,
+        screenX: 30,
+        screenY: 10,
+      });
+      expect(idle).toHaveAttribute('data-fox-transient', 'dragging');
+
+      act(() => {
+        vi.advanceTimersByTime(1600);
+      });
+      expect(idle).toHaveAttribute('data-fox-transient', 'annoyed-drag');
+
+      dispatchPointer(fox, 'pointerup', {
+        button: 0,
+        pointerId: 33,
+        screenX: 30,
+        screenY: 10,
+      });
+      expect(idle).toHaveAttribute('data-fox-transient', 'none');
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(idle).toHaveAttribute('data-fox-transient', 'none');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops follow and drag wobble immediately when reduced motion turns on', () => {
+    let matches = false;
+    const listeners = new Set<(event: MediaQueryListEvent) => void>();
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation(() => ({
+        get matches() {
+          return matches;
+        },
+        addEventListener(_type: string, listener: (event: MediaQueryListEvent) => void) {
+          listeners.add(listener);
+        },
+        removeEventListener(_type: string, listener: (event: MediaQueryListEvent) => void) {
+          listeners.delete(listener);
+        },
+      })),
+    });
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 88,
+      height: 88,
+      top: 0,
+      left: 0,
+      right: 88,
+      bottom: 88,
+      toJSON() {
+        return {};
+      },
+    } as DOMRect);
+
+    try {
+      render(<FoxApp />);
+      const idle = screen.getByTestId('fox-idle');
+      dispatchClientPointer(idle, 'pointermove', { clientX: 80, clientY: 10 });
+      act(() => {
+        frames[0]?.(0);
+      });
+      expect(idle).toHaveAttribute('data-fox-follow', 'true');
+
+      matches = true;
+      act(() => {
+        for (const listener of listeners) {
+          listener({ matches: true } as MediaQueryListEvent);
+        }
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'static');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-follow', 'false');
+      expect(screen.getByTestId('fox-idle').style.getPropertyValue('--fox-follow-x')).toBe('');
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
+  });
+
+  it('keeps a static closed eye and Z sleep state under reduced motion', () => {
+    vi.useFakeTimers();
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    });
+    try {
+      render(<FoxApp />);
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'static');
+      act(() => {
+        vi.advanceTimersByTime(FOX_SLEEP_AFTER_MS);
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'sleeping');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-expression', 'closed');
+      expect(screen.getByTestId('fox-expression-layer')).toHaveAttribute('data-expression-state', 'closed');
+      expect(screen.getByTestId('fox-expression-closed')).toBeInTheDocument();
+      expect(screen.getByTestId('fox-sleep-mark')).toHaveTextContent('zZZ');
+      expect(screen.queryByTestId('fox-headset-signal')).toBeNull();
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops the rectangular fox outline on pointer drag and keeps a non-rect keyboard focus ring', () => {
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    const ring = screen.getByTestId('fox-focus-ring');
+    expect(fox).toHaveClass('fox-button');
+    expect(fox.style.outline).toBe('');
+    expect(ring).toBeInTheDocument();
+
+    fireEvent.focus(fox);
+    expect(idle).toHaveAttribute('data-fox-keyboard-focus', 'false');
+
+    const matchesSpy = vi.spyOn(fox, 'matches').mockImplementation((selector: string) => selector === ':focus-visible');
+    fireEvent.focus(fox);
+    expect(idle).toHaveAttribute('data-fox-keyboard-focus', 'true');
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 71,
+      screenX: 40,
+      screenY: 40,
+    });
+    expect(idle).toHaveAttribute('data-fox-keyboard-focus', 'false');
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 71,
+      screenX: 80,
+      screenY: 44,
+    });
+    expect(idle).toHaveAttribute('data-fox-pose', 'dragging');
+    expect(idle).toHaveAttribute('data-fox-keyboard-focus', 'false');
+    expect(fox.style.outline).toBe('');
+    expect(ring).toHaveAttribute('aria-hidden', 'true');
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 71, screenX: 80, screenY: 44 });
+    matchesSpy.mockRestore();
+  });
+
+  it('keeps a single canonical fox image without visor slits or white glints', () => {
+    const { unmount } = render(<FoxApp />);
+    expect(document.querySelector('.fox-head-image')).toBeInTheDocument();
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-expression', 'none');
+    expect(screen.getByTestId('fox-expression-layer')).toHaveAttribute('data-expression-state', 'awake');
+    expect(screen.getByTestId('fox-expression-awake')).toHaveAttribute('fill', '#A45C4A');
+    expect(screen.getByTestId('fox-expression-awake').querySelector('ellipse')).toBeNull();
+    expect(screen.getByTestId('fox-expression-layer').querySelector('.fox-expression-cover')).toHaveAttribute('fill', '#F9D6C5');
+    expect(screen.queryByTestId('fox-headset-signal')).toBeNull();
+    expect(document.querySelector('[data-testid="fox-visor-layer"]')).toBeNull();
+    expect(document.querySelector('[data-testid="fox-eye-slit-left"]')).toBeNull();
+    expect(document.querySelector('[data-testid="fox-eye-glint-left"]')).toBeNull();
+    expect(screen.getByTestId('fox-idle')).not.toHaveAttribute('data-eye-follow-max-px');
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-settle-watchdog-ms', '1600');
+    unmount();
+
+    render(<QueryApp />);
+    expect(document.querySelector('.fox-head-image')).toBeInTheDocument();
+    expect(screen.getByTestId('fox-expression-layer')).toHaveAttribute('data-expression-state', 'awake');
+    expect(screen.getByTestId('fox-expression-awake')).toHaveAttribute('fill', '#A45C4A');
+    expect(screen.queryByTestId('fox-headset-signal')).toBeNull();
+    expect(document.querySelector('[data-testid="fox-visor-layer"]')).toBeNull();
+    expect(document.querySelector('[data-testid="fox-eye-slit-left"]')).toBeNull();
+  });
+
+  it('starts a docked session from pointerdown and keeps net-outward gestures docked', () => {
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'left', epoch: 80 });
+      }
+    });
+    expect(idle).toHaveAttribute('data-dock-edge', 'left');
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 72,
+      screenX: 40,
+      screenY: 80,
+    });
+    expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 72,
+      screenX: 20,
+      screenY: 100,
+    });
+    expect(idle).toHaveAttribute('data-dock-edge', 'left');
+    expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+    expect(idle).toHaveClass('is-docked-left');
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 72,
+      screenX: 30,
+      screenY: 100,
+    });
+    expect(idle).toHaveAttribute('data-dock-edge', 'left');
+    expect(idle).toHaveClass('is-docked-left');
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 72,
+      screenX: 50,
+      screenY: 100,
+    });
+    expect(idle).toHaveAttribute('data-dock-edge', 'none');
+    expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+    expect(Number.parseFloat(idle.style.getPropertyValue('--fox-session-x'))).toBeLessThan(0);
+    expect(moveFoxBy).toHaveBeenCalled();
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 72, screenX: 50, screenY: 100 });
+  });
+
+  it('atomically undocks an inward drag and compensates the head without a peek-zero hop', () => {
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'left', epoch: 81 });
+      }
+    });
+    expect(idle).toHaveAttribute('data-peeking', 'false');
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 73,
+      screenX: 20,
+      screenY: 80,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 73,
+      screenX: 36,
+      screenY: 80,
+    });
+    expect(idle).toHaveAttribute('data-dock-edge', 'none');
+    expect(idle).toHaveAttribute('data-peeking', 'false');
+    expect(idle).toHaveAttribute('data-retracting', 'false');
+    expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+    expect(idle).toHaveAttribute('data-fox-peek-armed', 'false');
+    expect(Number.parseFloat(idle.style.getPropertyValue('--fox-session-x'))).toBeLessThan(0);
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 73, screenX: 36, screenY: 80 });
+  });
+
+  it('does not peek after snap or drag until pointerleave then enter', async () => {
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) =>
+      Promise.resolve(finished
+        ? { edge: 'left', epoch: 83, openSearchRequested: false }
+        : null));
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'left', epoch: 82 });
+      }
+    });
+    fireEvent.pointerEnter(fox);
+    expect(idle).toHaveAttribute('data-peeking', 'true');
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 74,
+      screenX: 20,
+      screenY: 80,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 74,
+      screenX: 48,
+      screenY: 80,
+    });
+    expect(idle).toHaveAttribute('data-fox-peek-armed', 'false');
+    fireEvent.pointerEnter(fox);
+    expect(idle).toHaveAttribute('data-peeking', 'false');
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 74, screenX: 48, screenY: 80 });
+    await waitFor(() => {
+      expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    });
+    fireEvent.pointerEnter(fox);
+    expect(idle).toHaveAttribute('data-peeking', 'false');
+    fireEvent.pointerLeave(fox);
+    expect(idle).toHaveAttribute('data-fox-peek-armed', 'true');
+    fireEvent.pointerEnter(fox);
+    expect(idle).toHaveAttribute('data-peeking', 'true');
+  });
+
+  it('resets visor offsets before opening search so the handoff first frame stays centered', async () => {
+    render(<FoxApp />);
+    const idle = screen.getByTestId('fox-idle');
+    idle.style.setProperty('--fox-session-x', '-34.00px');
+    fireEvent.click(screen.getByTestId('fox-button'));
+    await waitFor(() => {
+      expect(openSearch).toHaveBeenCalledTimes(1);
+    });
+    expect(idle.style.getPropertyValue('--fox-session-x')).toBe('');
+    expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    expect(idle).toHaveClass('is-handoff-frozen');
+    const transform = openSearch.mock.calls[0]?.[0];
+    expect(transform).toMatchObject({
+      a: expect.any(Number),
+      b: expect.any(Number),
+      c: expect.any(Number),
+      d: expect.any(Number),
+      e: expect.any(Number),
+      f: expect.any(Number),
+    });
+  });
+
+  it('keeps session compensation across pointerup and late move echoes until the settle ack', async () => {
+    let resolveFinished: ((ack: FoxDragSettleAck | null) => void) | null = null;
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) {
+        return Promise.resolve(null);
+      }
+      return new Promise<FoxDragSettleAck | null>((resolve) => {
+        resolveFinished = resolve;
+      });
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    const ring = screen.getByTestId('fox-focus-ring');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'left', epoch: 90 });
+      }
+    });
+    const matchesSpy = vi.spyOn(fox, 'matches').mockImplementation((selector: string) => selector === ':focus-visible');
+    fireEvent.focus(fox);
+    expect(idle).toHaveAttribute('data-fox-keyboard-focus', 'true');
+    Object.defineProperty(ring, 'isConnected', { configurable: true, value: true });
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 91,
+      screenX: 20,
+      screenY: 80,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 91,
+      screenX: 26,
+      screenY: 80,
+    });
+    expect(idle).toHaveAttribute('data-dock-edge', 'none');
+    const sessionBeforeUp = idle.style.getPropertyValue('--fox-session-x');
+    expect(Number.parseFloat(sessionBeforeUp)).toBeLessThan(0);
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 91, screenX: 26, screenY: 80 });
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+    expect(idle.style.getPropertyValue('--fox-session-x')).toBe(sessionBeforeUp);
+    expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'none', epoch: 91 });
+      }
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+    expect(idle.style.getPropertyValue('--fox-session-x')).toBe(sessionBeforeUp);
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'sync-fox-edge', edge: 'right', epoch: 92 });
+      }
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+    expect(idle.style.getPropertyValue('--fox-session-x')).toBe(sessionBeforeUp);
+    act(() => {
+      resolveFinished?.({ edge: 'left', epoch: 93, openSearchRequested: false });
+    });
+    await waitFor(() => {
+      expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    });
+    expect(idle.style.getPropertyValue('--fox-session-x')).toBe('');
+    expect(idle).toHaveAttribute('data-dock-edge', 'right');
+    matchesSpy.mockRestore();
+  });
+
+  it('opens a shortcut request only after the dock drag settle ack is committed', async () => {
+    let resolveFinished: ((ack: FoxDragSettleAck | null) => void) | null = null;
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) {
+        return Promise.resolve(null);
+      }
+      return new Promise<FoxDragSettleAck | null>((resolve) => {
+        resolveFinished = resolve;
+      });
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'left', epoch: 94 });
+      }
+    });
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 94,
+      screenX: 20,
+      screenY: 80,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 94,
+      screenX: 30,
+      screenY: 80,
+    });
+    dispatchPointer(fox, 'pointerup', {
+      button: 0,
+      pointerId: 94,
+      screenX: 30,
+      screenY: 80,
+    });
+    expect(openSearch).not.toHaveBeenCalled();
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+    act(() => {
+      resolveFinished?.({ edge: 'left', epoch: 95, openSearchRequested: true });
+    });
+    await waitFor(() => {
+      expect(openSearch).toHaveBeenCalledTimes(1);
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    expect(idle).toHaveClass('is-handoff-frozen');
+  });
+
+  it('preserves an active reduced-motion drag session across an edge-none echo', () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: String(query).includes('prefers-reduced-motion'),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      })),
+    });
+    try {
+      render(<FoxApp />);
+      const fox = screen.getByTestId('fox-button');
+      const idle = screen.getByTestId('fox-idle');
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'fox-edge', edge: 'left', epoch: 92 });
+        }
+      });
+      dispatchPointer(fox, 'pointerdown', {
+        button: 0,
+        buttons: 1,
+        pointerId: 92,
+        screenX: 20,
+        screenY: 80,
+      });
+      dispatchPointer(fox, 'pointermove', {
+        button: 0,
+        buttons: 1,
+        pointerId: 92,
+        screenX: 48,
+        screenY: 80,
+      });
+      expect(idle).toHaveAttribute('data-fox-transient', 'none');
+      expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+      expect(idle).toHaveAttribute('data-dock-edge', 'none');
+      const sessionX = idle.style.getPropertyValue('--fox-session-x');
+      expect(Number.parseFloat(sessionX)).toBeLessThan(0);
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'fox-edge', edge: 'none', epoch: 93 });
+        }
+      });
+      expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
+      expect(idle.style.getPropertyValue('--fox-session-x')).toBe(sessionX);
+      dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 92, screenX: 48, screenY: 80 });
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
   });
 });

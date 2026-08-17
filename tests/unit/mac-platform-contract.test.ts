@@ -139,6 +139,9 @@ describe('macOS distribution contract', () => {
     expect(packageVerifier).toContain("basename.endsWith('.blockmap')");
     expect(packageFinalizer).toContain("path.basename(relativePath).endsWith('.blockmap')");
     expect(packageFinalizer).toContain("absolutePath.startsWith(`${outputDir}${path.sep}`)");
+    expect(packageVerifier).toContain('CFBundleIconFile');
+    expect(packageVerifier).toContain('LSUIElement');
+    expect(packageVerifier).toContain('LSBackgroundOnly');
     expect(packageVerifier).toContain("execFileSync('codesign'");
     expect(packageVerifier).toContain("execFileSync('spctl'");
     expect(packageVerifier).toContain("execFileSync('xcrun', ['stapler', 'validate'");
@@ -161,11 +164,38 @@ describe('macOS distribution contract', () => {
   });
 });
 
+describe('macOS Dock identity contract', () => {
+  it('keeps a regular Dock presence and only sets a dev icon on darwin', () => {
+    const main = readFileSync(path.join(root, 'src/main/main.ts'), 'utf8');
+    const identity = readFileSync(path.join(root, 'src/main/app-identity.ts'), 'utf8');
+    expect(identity).toContain("app.setActivationPolicy?.('regular')");
+    expect(identity).toContain('if (dock && !dock.isVisible())');
+    expect(identity).toContain('await dock.show()');
+    expect(identity).not.toContain('app.dock.hide');
+    expect(identity).toContain("process.platform !== 'darwin'");
+    expect(identity).toContain('app.dock?.setIcon');
+    expect(identity).toContain('!location.isPackaged');
+    const iconPaths = readFileSync(path.join(root, 'src/main/app-icon-paths.ts'), 'utf8');
+    const appIcon = readFileSync(path.join(root, 'src/shared/app-icon.ts'), 'utf8');
+    expect(iconPaths).toContain('APP_ICON_MASTER_RELATIVE_PATH');
+    expect(appIcon).toContain('assets/app-icon.png');
+    expect(identity).not.toContain('return trayIconCandidates');
+    expect(main).toContain('await applyApplicationIdentity(shuttingDown)');
+    expect(packageJson.build.mac.icon).toBe('build/icon.icns');
+    expect(packageJson.scripts['generate:app-icons']).toContain('scripts/generate-app-icons.mjs');
+    expect(packageRunner).toContain("['generate:app-icons']");
+    const gitignore = readFileSync(path.join(root, '.gitignore'), 'utf8');
+    expect(gitignore).toContain('build/icon.icns');
+    expect(gitignore).toContain('build/icon.png');
+    expect(gitignore).toContain('build/icon.ico');
+  });
+});
+
 describe('macOS runtime contract', () => {
-  it('keeps the focusable query visible across Spaces and reconciles display topology', () => {
-    expect(controller).toContain(
-      'setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })',
-    );
+  it('keeps a regular Dock and only reconciles Query on the current Space', () => {
+    expect(controller).not.toContain('skipTransformProcessType: true');
+    expect(controller).not.toContain('setVisibleOnAllWorkspaces(');
+    expect(controller).toContain('dispose(): void');
     for (const eventName of [
       'display-added',
       'display-removed',
@@ -176,5 +206,28 @@ describe('macOS runtime contract', () => {
     }
     expect(controller).toContain('DISPLAY_RECONCILE_DELAY_MS = 100');
     expect(controller).toContain('if (this.chromeHandoffMode !== null)');
+  });
+
+  it('adopts WindowServer fox bounds without moving the native window on hover', () => {
+    const peekMethod = controller.match(
+      /setFoxPeek\(intent: FoxPeekIntent, epoch: number\): void \{([\s\S]*?)\n {2}\}\n\n {2}beginNativeContextMenu/,
+    )?.[1] ?? '';
+    expect(peekMethod).toContain('this.syncFoxOriginFromNativeBounds(fox)');
+    expect(peekMethod).toContain('this.foxPeekIntent = intent');
+    expect(peekMethod).not.toContain('setBounds(');
+    expect(controller).toContain("fox.on('move', sync)");
+    expect(controller).toContain("fox.on('moved', sync)");
+    expect(controller).toMatch(
+      /openSearch[\s\S]*if \(this\.isWindowVisible\(idleFox\)\) \{\s*this\.syncFoxOriginFromNativeBounds\(idleFox\)/,
+    );
+    expect(controller).toContain(
+      'foxVisualCenterForNativeRect(fullFoxRect, this.foxDockEdge, peekOffset)',
+    );
+    const closingMethod = controller.match(
+      /private finishClosingHandoff\(handoffId: number\): void \{([\s\S]*?)\n {2}\}\n\n {2}private focusQueryWindow/,
+    )?.[1] ?? '';
+    expect(closingMethod).toContain('fox.setBounds(foxRect)');
+    expect(closingMethod).not.toContain('dockFoxNativeRect');
+    expect(closingMethod).toContain('this.syncFoxOriginFromNativeBounds(fox)');
   });
 });

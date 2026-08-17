@@ -11,6 +11,10 @@ This Demo includes the following third-party software:
 These notices apply only to the listed third-party components. They do not
 grant a license to the Customer Agent Demo itself.
 
+`build/icon.icns`、`build/icon.ico` 与 `build/icon.png` 由仓内 `fox-head.png`
+经 `scripts/generate-app-icons.mjs` / `scripts/generate-mac-icon.sh` 机械生成，
+不引入网络资源或第三方图标库。
+
 ## React, React DOM, and Scheduler — MIT License
 
 Copyright (c) Facebook, Inc. and its affiliates.
