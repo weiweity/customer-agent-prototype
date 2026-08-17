@@ -127,7 +127,7 @@ describe('query content-hugging layout', () => {
         deltaY,
       })).toBe(true);
     }
-    for (const deltaY of [-4097, 4097, Number.POSITIVE_INFINITY, Number.NaN, '12']) {
+    for (const deltaY of [-4097, -0.5, 0.5, 4097, Number.POSITIVE_INFINITY, Number.NaN, '12']) {
       expect(isQueryResizeRequest({
         type: 'update',
         sessionId: 2,

@@ -5,6 +5,8 @@ import { registerOverlayIpc } from './overlay-ipc';
 import { applySessionSecurity } from './window-security';
 import { installDesktopShell, type DesktopShell } from './desktop-shell';
 import { applyApplicationIdentity } from './app-identity';
+import { handleDesktopActivate, handleSecondInstance } from './desktop-lifecycle';
+import { notifyDashboardOpenFailure } from './dashboard-open-failure';
 import { createShutdownFence } from './shutdown-fence';
 import { resolveRendererDevServerUrl } from '../shared/renderer-url';
 
@@ -51,21 +53,31 @@ if (!gotLock) {
   app.setName('客服话术浮窗 Demo');
 
   const handleActivate = (): void => {
-    if (shuttingDown.isShuttingDown() || !controller || !controllerReady) {
-      return;
-    }
     // The Dock icon represents the full application surface. Keep the global
     // shortcut and fox click dedicated to quick query, and use Dock activation
     // for the manager-facing Dashboard as macOS users expect from a normal app.
     // `activate` is the one user-initiated path where stealing focus is
     // appropriate: a synthetic event in Electron tests does not itself make the
     // process active, while a real Dock click normally does.
-    if (process.platform === 'darwin') {
-      app.focus({ steal: true });
-    }
-    void controller.openDashboard().catch((error: unknown) => {
-      console.error('[dashboard] Dock 激活时打开工作台失败。', error);
-    });
+    handleDesktopActivate(
+      {
+        isShuttingDown: () => shuttingDown.isShuttingDown(),
+        isControllerReady: () => controllerReady,
+        getController: () => controller,
+      },
+      {
+        focusApp: process.platform === 'darwin'
+          ? () => {
+              app.focus({ steal: true });
+            }
+          : undefined,
+        onFailure: (reason) => {
+          if (!shuttingDown.isShuttingDown()) {
+            void notifyDashboardOpenFailure(reason);
+          }
+        },
+      },
+    );
   };
 
   const beginShutdown = (): void => {
@@ -80,11 +92,18 @@ if (!gotLock) {
   };
 
   app.on('second-instance', () => {
-    if (shuttingDown.isShuttingDown() || !controllerReady) {
-      pendingSecondInstance = !shuttingDown.isShuttingDown();
-      return;
-    }
-    controller?.activateExisting();
+    handleSecondInstance(
+      {
+        isShuttingDown: () => shuttingDown.isShuttingDown(),
+        isControllerReady: () => controllerReady,
+        getController: () => controller,
+      },
+      {
+        setPending: (pending) => {
+          pendingSecondInstance = pending;
+        },
+      },
+    );
   });
 
   void app.whenReady().then(async () => {

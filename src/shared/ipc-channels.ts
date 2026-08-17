@@ -10,6 +10,7 @@ export const IPC_CHANNELS = {
   REPORT_QUERY_LAYOUT: 'overlay:report-query-layout',
   RESIZE_QUERY_HEIGHT: 'overlay:resize-query-height',
   MOVE_FOX_BY: 'overlay:move-fox-by',
+  COMMIT_FOX_DRAG_SETTLE: 'overlay:commit-fox-drag-settle',
   SET_FOX_PEEK: 'overlay:set-fox-peek',
   OVERLAY_COMMAND: 'overlay:command',
 } as const;

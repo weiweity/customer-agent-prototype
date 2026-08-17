@@ -170,8 +170,7 @@ export function isQueryResizeRequest(value: unknown): value is QueryResizeReques
       hasExactKeys(value, QUERY_RESIZE_UPDATE_KEYS) &&
       isQueryLayoutSessionId(request.sessionId) &&
       isQueryLayoutSequence(request.sequence) &&
-      typeof request.deltaY === 'number' &&
-      Number.isFinite(request.deltaY) &&
+      isFiniteQueryInteger(request.deltaY) &&
       Math.abs(request.deltaY) <= 4096
     );
   }

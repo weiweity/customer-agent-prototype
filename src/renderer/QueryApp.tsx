@@ -823,16 +823,28 @@ export function QueryApp() {
   const openDashboard = useCallback(() => {
     dashboardOpenFailedRef.current = false;
     const request = window.customerAgent?.openDashboard();
-    if (!request) {
+    const failOpen = (): void => {
       dashboardOpenFailedRef.current = true;
       setErrorMessage('工作台未打开，请重试。查询窗口仍保持可用。');
       reportPhase('ERROR', results.length as ResultCount);
+    };
+    if (!request) {
+      failOpen();
       return;
     }
-    void request.catch(() => {
-      dashboardOpenFailedRef.current = true;
-      setErrorMessage('工作台未打开，请重试。查询窗口仍保持可用。');
-      reportPhase('ERROR', results.length as ResultCount);
+    void Promise.resolve(request).then((result) => {
+      if (!result || result.ok !== true) {
+        failOpen();
+        return;
+      }
+      dashboardOpenFailedRef.current = false;
+      setErrorMessage('');
+      if (phaseRef.current === 'ERROR') {
+        const resultCount = results.length as ResultCount;
+        reportPhase(resultCount > 0 ? 'RESULTS' : 'SEARCH_INPUT', resultCount);
+      }
+    }).catch(() => {
+      failOpen();
     });
   }, [reportPhase, results.length]);
 
@@ -1028,7 +1040,10 @@ export function QueryApp() {
       finishQueryResize('cancel', event.pointerId);
       return;
     }
-    resizeDeltaRef.current = event.screenY - resizeOriginYRef.current;
+    // The preload/Main contract accepts finite integers only. Pointer
+    // coordinates can be fractional on scaled displays, so normalize once at
+    // the renderer boundary instead of silently rejecting a valid drag frame.
+    resizeDeltaRef.current = Math.round(event.screenY - resizeOriginYRef.current);
     if (resizeFrameRef.current !== null) {
       return;
     }

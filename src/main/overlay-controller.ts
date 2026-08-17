@@ -71,6 +71,10 @@ import type {
   ResultCount,
 } from '../shared/overlay-events';
 import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../shared/overlay-events';
+import {
+  openDashboardUnavailable,
+  type OpenDashboardResult,
+} from '../shared/dashboard-access';
 import { bindGlobalShortcut, DEFAULT_GLOBAL_ACCELERATOR } from '../shared/shortcut';
 import { QUERY_CLOSE_DURATION_MS, QUERY_OPEN_DURATION_MS } from '../shared/fox-motion';
 import {
@@ -120,6 +124,10 @@ export class OverlayController {
   private foxPeekIntent: FoxPeekIntent = 'retract';
   private foxPeekEpoch = 0;
   private foxDragSession: FoxDockDragSession | null = null;
+  private foxDragGeneration: number | null = null;
+  private legacyFoxDragGenerationSequence = 0;
+  private foxDragSettleSequence = 0;
+  private awaitingFoxDragSettle: FoxDragSettleAck | null = null;
   private displayReconcilePending = false;
   private pendingOpenAfterFoxDrag = false;
   private postFoxDragTimer: ReturnType<typeof setTimeout> | null = null;
@@ -148,7 +156,7 @@ export class OverlayController {
     previousManualHeight: number | null;
   } | null = null;
   private queryLayoutFallbackTimer: ReturnType<typeof setTimeout> | null = null;
-  private dashboardOpening: Promise<void> | null = null;
+  private dashboardOpening: Promise<OpenDashboardResult> | null = null;
   private disposed = false;
   private readonly fence: ShutdownFence;
   private readonly scheduler = new GuardedScheduler();
@@ -269,8 +277,13 @@ export class OverlayController {
     // A global shortcut can arrive while the pointer still owns a dock-drag
     // transaction. Finish the native settle first so the shared-element handoff
     // starts from the same visual frame the renderer is still displaying.
-    if (this.foxDragSession) {
+    if (
+      this.foxDragSession
+      || this.foxDragGeneration !== null
+      || this.awaitingFoxDragSettle !== null
+    ) {
       this.pendingOpenAfterFoxDrag = true;
+      this.pendingFoxVisualTransform = visualTransform;
       return;
     }
     this.advanceFoxPeekEpoch();
@@ -327,21 +340,15 @@ export class OverlayController {
     this.openSearch();
   }
 
-  async openDashboard(): Promise<void> {
+  async openDashboard(): Promise<OpenDashboardResult> {
     if (this.isInactive()) {
-      return;
+      return openDashboardUnavailable();
     }
     if (this.dashboardOpening) {
-      await this.dashboardOpening;
-      return;
+      return this.dashboardOpening;
     }
     if (this.dashboard && !this.dashboard.isDestroyed()) {
-      if (this.dashboard.isMinimized()) {
-        this.dashboard.restore();
-      }
-      this.dashboard.show();
-      this.dashboard.focus();
-      return;
+      return this.revealDashboardWindow(this.dashboard);
     }
 
     const win = createDashboardBrowserWindow();
@@ -352,7 +359,7 @@ export class OverlayController {
         this.dashboard = null;
       }
     });
-    const opening = (async (): Promise<void> => {
+    const opening = (async (): Promise<OpenDashboardResult> => {
       let loadState: 'loaded' | 'cancelled';
       try {
         loadState = await loadRenderer(
@@ -362,31 +369,60 @@ export class OverlayController {
           () => this.isInactive(),
         );
       } catch (error) {
-        if (this.dashboard === win) {
-          this.dashboard = null;
-        }
-        if (!win.isDestroyed()) {
-          win.destroy();
-        }
-        throw error;
+        console.error('Failed to load Dashboard renderer', error);
+        this.abandonDashboardWindow(win);
+        return openDashboardUnavailable();
       }
       if (loadState === 'cancelled' || this.isInactive() || win.isDestroyed()) {
-        return;
+        this.abandonDashboardWindow(win);
+        return openDashboardUnavailable();
       }
-      this.dismiss();
-      if (this.isInactive() || win.isDestroyed()) {
-        return;
-      }
-      win.show();
-      win.focus();
+      return this.revealDashboardWindow(win);
     })();
     this.dashboardOpening = opening;
     try {
-      await opening;
+      return await opening;
     } finally {
       if (this.dashboardOpening === opening) {
         this.dashboardOpening = null;
       }
+    }
+  }
+
+  private revealDashboardWindow(win: BrowserWindow): OpenDashboardResult {
+    if (this.isInactive() || win.isDestroyed()) {
+      this.abandonDashboardWindow(win);
+      return openDashboardUnavailable();
+    }
+    try {
+      if (win.isMinimized()) {
+        win.restore();
+      }
+      if (this.isInactive() || win.isDestroyed()) {
+        this.abandonDashboardWindow(win);
+        return openDashboardUnavailable();
+      }
+      win.show();
+      win.focus();
+      if (this.isInactive() || win.isDestroyed()) {
+        this.abandonDashboardWindow(win);
+        return openDashboardUnavailable();
+      }
+    } catch (error) {
+      console.error('Failed to reveal Dashboard window', error);
+      this.abandonDashboardWindow(win);
+      return openDashboardUnavailable();
+    }
+    this.dismiss();
+    return { ok: true };
+  }
+
+  private abandonDashboardWindow(win: BrowserWindow): void {
+    if (this.dashboard === win) {
+      this.dashboard = null;
+    }
+    if (!win.isDestroyed()) {
+      win.destroy();
     }
   }
 
@@ -599,7 +635,12 @@ export class OverlayController {
     }
   }
 
-  moveBy(dx: unknown, dy: unknown, finished = false): FoxDragSettleAck | null {
+  moveBy(
+    dx: unknown,
+    dy: unknown,
+    finished = false,
+    generation?: number,
+  ): FoxDragSettleAck | null {
     if (this.isInactive()) {
       return null;
     }
@@ -613,6 +654,29 @@ export class OverlayController {
     const target = this.isWindowVisible(this.query) ? this.query : this.fox;
     if (!target || target.isDestroyed()) {
       return null;
+    }
+    let foxGeneration: number | null = null;
+    if (target === this.fox) {
+      foxGeneration = generation ?? this.legacyFoxDragGeneration(finished);
+      if (foxGeneration === null) {
+        return null;
+      }
+      if (!finished) {
+        if (this.foxDragGeneration === null) {
+          this.foxDragGeneration = foxGeneration;
+          // A real move from a newer renderer generation supersedes any final
+          // frame that the previous generation never committed. Clear this
+          // unconditionally because a renderer reload may restart generation
+          // numbering at 1 while Main's settleId remains monotonic.
+          this.awaitingFoxDragSettle = null;
+        } else if (this.foxDragGeneration !== foxGeneration) {
+          return null;
+        }
+      } else if (this.foxDragGeneration !== foxGeneration) {
+        // A finished message without the matching native session is stale or
+        // out of order. Never manufacture a settle ACK for it.
+        return null;
+      }
     }
     const nativeBounds = target.getBounds();
     const sessionWorkArea = this.testHarness
@@ -686,6 +750,11 @@ export class OverlayController {
       if (target === this.fox) {
         const session = this.foxDragSession;
         this.foxDragSession = null;
+        const settledGeneration = this.foxDragGeneration;
+        this.foxDragGeneration = null;
+        if (settledGeneration === null) {
+          return null;
+        }
         const inferredFox = {
           x: this.foxOrigin.x,
           y: this.foxOrigin.y,
@@ -707,16 +776,44 @@ export class OverlayController {
         this.fox.setBounds(settled.rect);
         this.foxOrigin = { x: settled.rect.x, y: settled.rect.y };
         const epoch = this.resetFoxPeekLifecycle(settled.edge);
-        const openSearchRequested = this.pendingOpenAfterFoxDrag;
-        this.pendingOpenAfterFoxDrag = false;
+        const settle: FoxDragSettleAck = {
+          edge: settled.edge,
+          epoch,
+          generation: settledGeneration,
+          settleId: ++this.foxDragSettleSequence,
+        };
+        this.awaitingFoxDragSettle = settle;
+        this.sendToFox({ type: 'fox-drag-settled', ...settle });
         this.clearQueryDragGesture();
         this.schedulePostFoxDragWork();
-        return { edge: settled.edge, epoch, openSearchRequested };
+        return settle;
       } else {
         this.settlePinnedQueryDrag(next, workArea);
       }
     }
     return null;
+  }
+
+  commitFoxDragSettle(settleId: number): void {
+    if (this.isInactive()) {
+      return;
+    }
+    const awaiting = this.awaitingFoxDragSettle;
+    if (!awaiting || awaiting.settleId !== settleId) {
+      return;
+    }
+    this.awaitingFoxDragSettle = null;
+    if (this.foxDragSession || this.foxDragGeneration !== null) {
+      return;
+    }
+    if (!this.pendingOpenAfterFoxDrag) {
+      return;
+    }
+    const visualTransform = this.pendingFoxVisualTransform;
+    this.pendingOpenAfterFoxDrag = false;
+    // Main owns this transition: clearing the final settle fence and starting
+    // the Query handoff happen in the same event-loop turn.
+    this.openSearch(visualTransform);
   }
 
   setFoxPeek(intent: FoxPeekIntent, epoch: number): void {
@@ -773,6 +870,9 @@ export class OverlayController {
     this.clearQueryLayoutFallback();
     this.displayReconcilePending = false;
     this.pendingOpenAfterFoxDrag = false;
+    this.foxDragSession = null;
+    this.foxDragGeneration = null;
+    this.awaitingFoxDragSettle = null;
     this.scheduler.clear(this.postFoxDragTimer);
     this.postFoxDragTimer = null;
     this.queryResizeSession = null;
@@ -1088,7 +1188,7 @@ export class OverlayController {
     // Display topology is authoritative, but interrupting an in-flight dock
     // drag would split Main's native frame from the renderer's crop offset.
     // Defer one reconcile until the finished drag acknowledgement is produced.
-    if (this.foxDragSession) {
+    if (this.foxDragSession || this.foxDragGeneration !== null) {
       this.displayReconcilePending = true;
       return;
     }
@@ -1384,7 +1484,7 @@ export class OverlayController {
     }
     this.postFoxDragTimer = this.scheduler.schedule(() => {
       this.postFoxDragTimer = null;
-      if (this.isInactive() || this.foxDragSession) {
+      if (this.isInactive() || this.foxDragSession || this.foxDragGeneration !== null) {
         return;
       }
       if (this.displayReconcilePending) {
@@ -1398,6 +1498,20 @@ export class OverlayController {
     if (this.live(this.query) && !this.query.webContents.isDestroyed()) {
       this.query.webContents.send(IPC_CHANNELS.OVERLAY_COMMAND, command);
     }
+  }
+
+  private legacyFoxDragGeneration(finished: boolean): number | null {
+    if (!this.testHarness) {
+      return null;
+    }
+    if (this.foxDragGeneration !== null) {
+      return this.foxDragGeneration;
+    }
+    if (finished) {
+      return null;
+    }
+    this.legacyFoxDragGenerationSequence += 1;
+    return this.legacyFoxDragGenerationSequence;
   }
 
   private armBlurGrace(): void {

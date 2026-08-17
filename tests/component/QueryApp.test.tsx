@@ -88,6 +88,7 @@ describe('QueryApp', () => {
     }));
     commandListeners.clear();
     copyText.mockResolvedValue({ ok: true });
+    openDashboard.mockResolvedValue({ ok: true });
     getPlatform.mockResolvedValue({ platform: 'darwin' });
     getWindowContext.mockResolvedValue({
       role: 'query',
@@ -111,6 +112,7 @@ describe('QueryApp', () => {
       reportQueryLayout,
       resizeQueryHeight,
       moveFoxBy,
+      commitFoxDragSettle: vi.fn(),
       setFoxPeek,
       onOverlayCommand(handler) {
         commandListeners.add(handler);
@@ -882,16 +884,30 @@ describe('QueryApp', () => {
   it('keeps query usable and offers retry feedback when dashboard opening fails', async () => {
     const user = userEvent.setup();
     openDashboard
-      .mockRejectedValueOnce(new Error('dashboard failed'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce({ ok: false, message: '工作台未打开，请重试。查询窗口仍保持可用。' })
+      .mockResolvedValueOnce({ ok: true });
     render(<QueryApp />);
 
     await user.click(screen.getByTestId('open-dashboard'));
     expect(await screen.findByTestId('error-state')).toHaveTextContent('工作台未打开，请重试');
     expect(screen.getByTestId('question-input')).toBeVisible();
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId('retry-button'));
     expect(openDashboard).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(screen.queryByTestId('error-state')).not.toBeInTheDocument();
+    });
+  });
+
+  it('does not pretend success when dashboard opening rejects', async () => {
+    const user = userEvent.setup();
+    openDashboard.mockRejectedValueOnce(new Error('dashboard failed'));
+    render(<QueryApp />);
+
+    await user.click(screen.getByTestId('open-dashboard'));
+    expect(await screen.findByTestId('error-state')).toHaveTextContent('工作台未打开，请重试');
+    expect(screen.getByTestId('question-input')).toBeVisible();
   });
 
   function openQuerySession(handoffId: number) {

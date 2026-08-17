@@ -16,6 +16,7 @@ const openDashboard = vi.fn();
 const dismiss = vi.fn();
 const reportUiPhase = vi.fn();
 const moveFoxBy = vi.fn();
+const commitFoxDragSettle = vi.fn();
 const setFoxPeek = vi.fn();
 const commandListeners = new Set<(command: OverlayCommand) => void>();
 
@@ -63,6 +64,8 @@ describe('FoxApp', () => {
     reportUiPhase.mockReset();
     moveFoxBy.mockReset();
     moveFoxBy.mockResolvedValue(null);
+    commitFoxDragSettle.mockReset();
+    commitFoxDragSettle.mockResolvedValue(undefined);
     setFoxPeek.mockReset();
     setFoxPeek.mockResolvedValue(undefined);
     getPlatform.mockResolvedValue({ platform: 'darwin' });
@@ -86,6 +89,7 @@ describe('FoxApp', () => {
       dismiss,
       reportUiPhase,
       moveFoxBy,
+      commitFoxDragSettle,
       setFoxPeek,
       onOverlayCommand(handler: (command: OverlayCommand) => void) {
         commandListeners.add(handler);
@@ -225,7 +229,7 @@ describe('FoxApp', () => {
       clientY: 36,
     });
     await waitFor(() => {
-      expect(moveFoxBy).toHaveBeenCalledWith(0, 0, true);
+      expect(moveFoxBy).toHaveBeenCalledWith(0, 0, true, 1);
     });
     expect(splitDragDelta(38, 26)).toEqual([{ dx: 38, dy: 26 }]);
     expect(openSearch).not.toHaveBeenCalled();
@@ -253,7 +257,7 @@ describe('FoxApp', () => {
       clientY: 20,
     });
 
-    expect(moveFoxBy).toHaveBeenCalledWith(6, 0, false);
+    expect(moveFoxBy).toHaveBeenCalledWith(6, 0, false, 1);
   });
 
   it('finishes a moved drag when a later pointermove reports buttons=0', () => {
@@ -287,7 +291,7 @@ describe('FoxApp', () => {
       clientY: 60,
     });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
     const callsAfterRelease = moveFoxBy.mock.calls.length;
     dispatchPointer(fox, 'pointermove', {
       button: 0,
@@ -321,7 +325,7 @@ describe('FoxApp', () => {
     });
     fireEvent.lostPointerCapture(fox, { pointerId: 8 });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
     const callsAfterCaptureLoss = moveFoxBy.mock.calls.length;
     fireEvent.pointerMove(fox, {
       buttons: 1,
@@ -353,7 +357,7 @@ describe('FoxApp', () => {
       window.dispatchEvent(new Event('blur'));
     });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
     const callsAfterBlur = moveFoxBy.mock.calls.length;
     fireEvent.pointerMove(fox, {
       buttons: 1,
@@ -438,7 +442,7 @@ describe('FoxApp', () => {
     expect(moveFoxBy).toHaveBeenCalled();
     const callsAfterMove = moveFoxBy.mock.calls.length;
     dispatchPointer(fox, 'pointercancel', { pointerId: 27 });
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
     expect(moveFoxBy.mock.calls.length).toBe(callsAfterMove + 1);
     expect(openSearch).not.toHaveBeenCalled();
     expect(idle).toHaveAttribute('data-fox-transient', 'none');
@@ -454,7 +458,7 @@ describe('FoxApp', () => {
     expect(openSearch).not.toHaveBeenCalled();
   });
 
-  it('recovers a pending settle with a generation-guarded watchdog and ignores a stale ACK', async () => {
+  it('recovers a valid late final settle after the visual watchdog without opening Query itself', async () => {
     vi.useFakeTimers();
     let resolveStale: ((ack: FoxDragSettleAck | null) => void) | null = null;
     moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
@@ -489,10 +493,12 @@ describe('FoxApp', () => {
         await vi.advanceTimersByTimeAsync(1600);
       });
       expect(idle).toHaveAttribute('data-fox-settling', 'false');
-      act(() => {
-        resolveStale?.({ edge: 'right', epoch: 44, openSearchRequested: true });
+      await act(async () => {
+        resolveStale?.({ edge: 'right', epoch: 44, generation: 1, settleId: 44 });
+        await Promise.resolve();
       });
-      expect(idle).toHaveAttribute('data-dock-edge', 'none');
+      expect(idle).toHaveAttribute('data-dock-edge', 'right');
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(44);
       expect(openSearch).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -543,6 +549,7 @@ describe('FoxApp', () => {
       expect(idle).toHaveAttribute('data-fox-settling', 'false');
       expect(idle).toHaveAttribute('data-dock-edge', 'right');
       expect(idle.style.getPropertyValue('--fox-session-x')).toBe('');
+      expect(commitFoxDragSettle).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
@@ -649,7 +656,7 @@ describe('FoxApp', () => {
     expect(idle).toHaveAttribute('data-fox-settling', 'true');
 
     await act(async () => {
-      finishedResolvers[0]?.({ edge: 'right', epoch: 70, openSearchRequested: true });
+      finishedResolvers[0]?.({ edge: 'right', epoch: 70, generation: 1, settleId: 70 });
       await Promise.resolve();
     });
     expect(idle).toHaveAttribute('data-fox-settling', 'true');
@@ -657,12 +664,228 @@ describe('FoxApp', () => {
     expect(openSearch).not.toHaveBeenCalled();
 
     await act(async () => {
-      finishedResolvers[1]?.({ edge: 'left', epoch: 71, openSearchRequested: false });
+      finishedResolvers[1]?.({ edge: 'left', epoch: 71, generation: 2, settleId: 71 });
       await Promise.resolve();
     });
     expect(idle).toHaveAttribute('data-fox-settling', 'false');
     expect(idle).toHaveAttribute('data-dock-edge', 'left');
+    expect(commitFoxDragSettle).toHaveBeenCalledTimes(1);
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(71);
     expect(openSearch).not.toHaveBeenCalled();
+  });
+
+  it('does not let an older fox-edge echo override a newer settle ACK', async () => {
+    let resolveAck: ((ack: FoxDragSettleAck | null) => void) | null = null;
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>((resolve) => {
+        resolveAck = resolve;
+      });
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 34,
+      screenX: 20,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 34,
+      screenX: 50,
+      screenY: 28,
+    });
+    act(() => {
+      dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 34, screenX: 50, screenY: 28 });
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'right', epoch: 10 });
+      }
+    });
+    await act(async () => {
+      resolveAck?.({ edge: 'left', epoch: 11, generation: 1, settleId: 11 });
+      await Promise.resolve();
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    expect(idle).toHaveAttribute('data-dock-edge', 'left');
+  });
+
+  it('keeps buffered sync epochs monotonic and lets the newest sync override an older settle ACK', async () => {
+    let resolveAck: ((ack: FoxDragSettleAck | null) => void) | null = null;
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>((resolve) => {
+        resolveAck = resolve;
+      });
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 35,
+      screenX: 20,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 35,
+      screenX: 50,
+      screenY: 28,
+    });
+    act(() => {
+      dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 35, screenX: 50, screenY: 28 });
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'sync-fox-edge', edge: 'right', epoch: 22 });
+        listener({ type: 'sync-fox-edge', edge: 'left', epoch: 21 });
+      }
+    });
+    await act(async () => {
+      resolveAck?.({ edge: 'left', epoch: 20, generation: 1, settleId: 20 });
+      await Promise.resolve();
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    expect(idle).toHaveAttribute('data-dock-edge', 'right');
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(20);
+    expect(openSearch).not.toHaveBeenCalled();
+  });
+
+  it('uses the final settle command as a watchdog-independent commit path and deduplicates the IPC reply', async () => {
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>(() => undefined);
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 36,
+      screenX: 20,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 36,
+      screenX: 50,
+      screenY: 28,
+    });
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 36, screenX: 50, screenY: 28 });
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+
+    const finalCommand: OverlayCommand = {
+      type: 'fox-drag-settled',
+      edge: 'right',
+      epoch: 30,
+      generation: 1,
+      settleId: 30,
+    };
+    act(() => {
+      for (const listener of commandListeners) listener(finalCommand);
+      for (const listener of commandListeners) listener(finalCommand);
+    });
+
+    await waitFor(() => {
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(30);
+    });
+    expect(commitFoxDragSettle).toHaveBeenCalledTimes(1);
+    expect(idle).toHaveAttribute('data-dock-edge', 'right');
+    expect(idle).toHaveAttribute('data-fox-settling', 'false');
+  });
+
+  it('defers an old final settle across a new no-move pointer generation, then commits after click dispatch', async () => {
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>(() => undefined);
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 37,
+      screenX: 20,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 37,
+      screenX: 50,
+      screenY: 28,
+    });
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 37, screenX: 50, screenY: 28 });
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 38,
+      screenX: 24,
+      screenY: 20,
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'fox-drag-settled',
+          edge: 'left',
+          epoch: 31,
+          generation: 1,
+          settleId: 31,
+        });
+      }
+    });
+    expect(commitFoxDragSettle).not.toHaveBeenCalled();
+
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 38, screenX: 24, screenY: 20 });
+    await waitFor(() => {
+      expect(openSearch).toHaveBeenCalledTimes(1);
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(31);
+    });
+  });
+
+  it('invalidates a pending settle on unmount so a late reply cannot commit Main', async () => {
+    let resolveFinished: ((ack: FoxDragSettleAck | null) => void) | null = null;
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>((resolve) => {
+        resolveFinished = resolve;
+      });
+    });
+    const view = render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 39,
+      screenX: 20,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 39,
+      screenX: 50,
+      screenY: 28,
+    });
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 39, screenX: 50, screenY: 28 });
+    view.unmount();
+
+    await act(async () => {
+      resolveFinished?.({ edge: 'right', epoch: 32, generation: 1, settleId: 32 });
+      await Promise.resolve();
+    });
+    expect(commitFoxDragSettle).not.toHaveBeenCalled();
   });
 
   it('does not fall asleep after being hidden and restarts the clock when visible again', () => {
@@ -1420,7 +1643,7 @@ describe('FoxApp', () => {
     }
   });
 
-  it('keeps a static closed eye and Z sleep state under reduced motion', () => {
+  it('keeps a static closed eye and Z sleep state, then wakes into semantic drag under reduced motion', () => {
     vi.useFakeTimers();
     const originalMatchMedia = window.matchMedia;
     Object.defineProperty(window, 'matchMedia', {
@@ -1443,6 +1666,26 @@ describe('FoxApp', () => {
       expect(screen.getByTestId('fox-expression-closed')).toBeInTheDocument();
       expect(screen.getByTestId('fox-sleep-mark')).toHaveTextContent('zZZ');
       expect(screen.queryByTestId('fox-headset-signal')).toBeNull();
+      const fox = screen.getByTestId('fox-button');
+      dispatchPointer(fox, 'pointerdown', {
+        button: 0,
+        buttons: 1,
+        pointerId: 64,
+        screenX: 20,
+        screenY: 20,
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-ambient', 'awake');
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-transient', 'pressed');
+      dispatchPointer(fox, 'pointermove', {
+        button: 0,
+        buttons: 1,
+        pointerId: 64,
+        screenX: 36,
+        screenY: 20,
+      });
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-transient', 'dragging');
+      expect(screen.getByTestId('fox-idle').style.getPropertyValue('--fox-drag-rot')).toBe('');
+      dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 64, screenX: 36, screenY: 20 });
     } finally {
       Object.defineProperty(window, 'matchMedia', {
         configurable: true,
@@ -1605,7 +1848,7 @@ describe('FoxApp', () => {
   it('does not peek after snap or drag until pointerleave then enter', async () => {
     moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) =>
       Promise.resolve(finished
-        ? { edge: 'left', epoch: 83, openSearchRequested: false }
+        ? { edge: 'left', epoch: 83, generation: 1, settleId: 83 }
         : null));
     render(<FoxApp />);
     const fox = screen.getByTestId('fox-button');
@@ -1727,7 +1970,7 @@ describe('FoxApp', () => {
     expect(idle).toHaveAttribute('data-fox-settling', 'true');
     expect(idle.style.getPropertyValue('--fox-session-x')).toBe(sessionBeforeUp);
     act(() => {
-      resolveFinished?.({ edge: 'left', epoch: 93, openSearchRequested: false });
+      resolveFinished?.({ edge: 'left', epoch: 93, generation: 1, settleId: 93 });
     });
     await waitFor(() => {
       expect(idle).toHaveAttribute('data-fox-settling', 'false');
@@ -1737,7 +1980,7 @@ describe('FoxApp', () => {
     matchesSpy.mockRestore();
   });
 
-  it('opens a shortcut request only after the dock drag settle ack is committed', async () => {
+  it('commits the dock drag final frame to Main without opening Query in Renderer', async () => {
     let resolveFinished: ((ack: FoxDragSettleAck | null) => void) | null = null;
     moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
       if (!finished) {
@@ -1778,13 +2021,14 @@ describe('FoxApp', () => {
     expect(openSearch).not.toHaveBeenCalled();
     expect(idle).toHaveAttribute('data-fox-settling', 'true');
     act(() => {
-      resolveFinished?.({ edge: 'left', epoch: 95, openSearchRequested: true });
+      resolveFinished?.({ edge: 'left', epoch: 95, generation: 1, settleId: 95 });
     });
     await waitFor(() => {
-      expect(openSearch).toHaveBeenCalledTimes(1);
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(95);
     });
     expect(idle).toHaveAttribute('data-fox-settling', 'false');
-    expect(idle).toHaveClass('is-handoff-frozen');
+    expect(openSearch).not.toHaveBeenCalled();
+    expect(idle).not.toHaveClass('is-handoff-frozen');
   });
 
   it('preserves an active reduced-motion drag session across an edge-none echo', () => {
@@ -1822,11 +2066,12 @@ describe('FoxApp', () => {
         screenX: 48,
         screenY: 80,
       });
-      expect(idle).toHaveAttribute('data-fox-transient', 'none');
+      expect(idle).toHaveAttribute('data-fox-transient', 'dragging');
       expect(idle).toHaveAttribute('data-fox-drag-session', 'left');
       expect(idle).toHaveAttribute('data-dock-edge', 'none');
       const sessionX = idle.style.getPropertyValue('--fox-session-x');
       expect(Number.parseFloat(sessionX)).toBeLessThan(0);
+      expect(idle.style.getPropertyValue('--fox-drag-rot')).toBe('');
       act(() => {
         for (const listener of commandListeners) {
           listener({ type: 'fox-edge', edge: 'none', epoch: 93 });

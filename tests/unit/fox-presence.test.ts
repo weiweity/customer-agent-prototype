@@ -688,7 +688,8 @@ describe('presence CSS and source contracts', () => {
     expect(presenceHook).toContain("document.visibilityState === 'hidden'");
     expect(presenceHook).toContain('clockRef.current?.invalidate()');
     expect(foxApp).toContain('pendingDragSyncRef');
-    expect(foxApp).toContain('openSearchRequested');
+    expect(foxApp).toContain('commitFoxDragSettle');
+    expect(foxApp).not.toContain('openSearchRequested');
     expect(foxApp).not.toContain("transientRef.current === 'dragging' || transientRef.current === 'annoyed-drag'");
     expect(dragHook).toContain('event.ctrlKey');
     expect(dragHook).toContain('event.button > 0');

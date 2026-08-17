@@ -1,4 +1,5 @@
 import { BrowserWindow, screen } from 'electron';
+import type { OpenDashboardResult } from '../shared/dashboard-access';
 import type { OverlayPhase } from '../shared/overlay-machine';
 import type { QueryResizeRequest } from '../shared/query-layout';
 import type { ReportablePhase, ResultCount } from '../shared/overlay-events';
@@ -11,7 +12,7 @@ export type OverlayTestHarnessHost = {
   toggle(): void;
   getWindows(): BrowserWindow[];
   moveBy(dx: number, dy: number, finished: boolean): void;
-  openDashboard(): Promise<void> | void;
+  openDashboard(): Promise<OpenDashboardResult> | OpenDashboardResult;
   closeDashboard(): void;
   dashboardSnapshot(): unknown;
   isDashboardTrusted(): boolean;

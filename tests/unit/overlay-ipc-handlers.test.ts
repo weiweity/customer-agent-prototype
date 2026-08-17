@@ -4,6 +4,10 @@ import type { OverlayController } from '../../src/main/overlay-controller';
 import { registerOverlayIpc } from '../../src/main/overlay-ipc';
 import { IPC_CHANNELS } from '../../src/shared/contracts';
 import {
+  OPEN_DASHBOARD_FAILURE_MESSAGE,
+  type OpenDashboardResult,
+} from '../../src/shared/dashboard-access';
+import {
   isQueryLayoutAck,
   type QueryLayoutAck,
   type QueryLayoutRequest,
@@ -11,7 +15,7 @@ import {
 } from '../../src/shared/query-layout';
 import type { RendererRole } from '../../src/shared/overlay-events';
 
-type CapturedHandler = (event: IpcMainInvokeEvent, payload: unknown) => unknown;
+type CapturedHandler = (event: IpcMainInvokeEvent, ...payload: unknown[]) => unknown;
 
 const electronMocks = vi.hoisted(() => {
   const handlers = new Map<string, CapturedHandler>();
@@ -87,7 +91,9 @@ function createControllerFixture() {
   const resizeQueryHeight = vi.fn((request: QueryResizeRequest) =>
     acceptedAck(request.sessionId, request.sequence, 360),
   );
-  const openDashboard = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+  const openDashboard = vi.fn<() => Promise<OpenDashboardResult>>().mockResolvedValue({ ok: true });
+  const moveBy = vi.fn().mockReturnValue(null);
+  const commitFoxDragSettle = vi.fn();
   const controller = {
     rendererDevServerUrl: DEV_SERVER_URL,
     trustedContents: () => [query.sender, fox.sender, dashboard.sender],
@@ -95,6 +101,8 @@ function createControllerFixture() {
     reportQueryLayout,
     resizeQueryHeight,
     openDashboard,
+    moveBy,
+    commitFoxDragSettle,
   } as unknown as OverlayController;
 
   return {
@@ -105,6 +113,8 @@ function createControllerFixture() {
     reportQueryLayout,
     resizeQueryHeight,
     openDashboard,
+    moveBy,
+    commitFoxDragSettle,
   };
 }
 
@@ -128,24 +138,97 @@ describe('overlay query layout IPC handlers', () => {
     electronMocks.handlers.clear();
   });
 
-  it('awaits dashboard opening and propagates renderer load failures to the trusted query', async () => {
+  it('awaits dashboard opening and returns a typed failure to the trusted query', async () => {
+    const fixture = createControllerFixture();
+    fixture.openDashboard.mockResolvedValueOnce({
+      ok: false,
+      message: OPEN_DASHBOARD_FAILURE_MESSAGE,
+    });
+    registerOverlayIpc(() => fixture.controller);
+    const handler = capturedHandler(IPC_CHANNELS.OPEN_DASHBOARD);
+
+    await expect(Promise.resolve(handler(fixture.query.event, undefined))).resolves.toEqual({
+      ok: false,
+      message: OPEN_DASHBOARD_FAILURE_MESSAGE,
+    });
+    expect(fixture.openDashboard).toHaveBeenCalledOnce();
+  });
+
+  it('returns a typed success after the trusted query waits for a loaded dashboard', async () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const handler = capturedHandler(IPC_CHANNELS.OPEN_DASHBOARD);
+
+    await expect(Promise.resolve(handler(fixture.query.event, undefined))).resolves.toEqual({ ok: true });
+    expect(fixture.openDashboard).toHaveBeenCalledOnce();
+  });
+
+  it('requires a generation for a production Fox move and forwards the valid transaction', () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const handler = capturedHandler(IPC_CHANNELS.MOVE_FOX_BY);
+
+    expect(handler(fixture.fox.event, 12, -4, false)).toBeNull();
+    expect(fixture.moveBy).not.toHaveBeenCalled();
+
+    expect(handler(fixture.fox.event, 12, -4, false, 3)).toBeNull();
+    expect(fixture.moveBy).toHaveBeenCalledOnce();
+    expect(fixture.moveBy).toHaveBeenCalledWith(12, -4, false, 3);
+  });
+
+  it('accepts a final settle commit only from the trusted Fox main frame', () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const handler = capturedHandler(IPC_CHANNELS.COMMIT_FOX_DRAG_SETTLE);
+
+    handler(fixture.query.event, 4);
+    handler(createSender(8, 'fox', { subframe: true }).event, 4);
+    handler(fixture.fox.event, 0);
+    expect(fixture.commitFoxDragSettle).not.toHaveBeenCalled();
+
+    handler(fixture.fox.event, 4);
+    expect(fixture.commitFoxDragSettle).toHaveBeenCalledOnce();
+    expect(fixture.commitFoxDragSettle).toHaveBeenCalledWith(4);
+  });
+
+  it.each([
+    ['untrusted renderer', () => createSender(99, 'query').event],
+    ['fox', (fixture: ReturnType<typeof createControllerFixture>) => fixture.fox.event],
+    ['dashboard', (fixture: ReturnType<typeof createControllerFixture>) => fixture.dashboard.event],
+  ])('fails closed for a %s without invoking the controller', async (_label, eventFor) => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const handler = capturedHandler(IPC_CHANNELS.OPEN_DASHBOARD);
+
+    await expect(Promise.resolve(handler(eventFor(fixture), undefined))).resolves.toEqual({
+      ok: false,
+      message: OPEN_DASHBOARD_FAILURE_MESSAGE,
+    });
+    expect(fixture.openDashboard).not.toHaveBeenCalled();
+  });
+
+  it('returns a typed failure when the overlay controller is unavailable', async () => {
+    registerOverlayIpc(() => null);
+    const query = createSender(7, 'query');
+    const handler = capturedHandler(IPC_CHANNELS.OPEN_DASHBOARD);
+
+    await expect(Promise.resolve(handler(query.event, undefined))).resolves.toEqual({
+      ok: false,
+      message: OPEN_DASHBOARD_FAILURE_MESSAGE,
+    });
+  });
+
+  it('turns an unexpected controller rejection into a typed failure', async () => {
     const fixture = createControllerFixture();
     fixture.openDashboard.mockRejectedValueOnce(new Error('dashboard failed'));
     registerOverlayIpc(() => fixture.controller);
     const handler = capturedHandler(IPC_CHANNELS.OPEN_DASHBOARD);
 
-    await expect(Promise.resolve(handler(fixture.query.event, undefined))).rejects.toThrow('dashboard failed');
+    await expect(Promise.resolve(handler(fixture.query.event, undefined))).resolves.toEqual({
+      ok: false,
+      message: OPEN_DASHBOARD_FAILURE_MESSAGE,
+    });
     expect(fixture.openDashboard).toHaveBeenCalledOnce();
-  });
-
-  it('rejects dashboard opening from an untrusted renderer without invoking the controller', async () => {
-    const fixture = createControllerFixture();
-    registerOverlayIpc(() => fixture.controller);
-    const handler = capturedHandler(IPC_CHANNELS.OPEN_DASHBOARD);
-    const outsider = createSender(99, 'query');
-
-    await expect(Promise.resolve(handler(outsider.event, undefined))).resolves.toBeUndefined();
-    expect(fixture.openDashboard).not.toHaveBeenCalled();
   });
 
   it('forwards a valid layout report from the trusted query main frame', () => {
@@ -241,7 +324,33 @@ describe('overlay query layout IPC handlers', () => {
     expect(fixture.reportQueryLayout).not.toHaveBeenCalled();
   });
 
-  it('fails closed for malformed layout and resize payloads', () => {
+  it('forwards in-range query resize deltas from the trusted query main frame', () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+
+    for (const deltaY of [-4096, 4096]) {
+      fixture.resizeQueryHeight.mockClear();
+      const accepted = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(
+        fixture.query.event,
+        {
+          type: 'update',
+          sessionId: 30,
+          sequence: 11,
+          deltaY,
+        },
+      );
+      expect(accepted).toEqual(acceptedAck(30, 11, 360));
+      expect(fixture.resizeQueryHeight).toHaveBeenCalledOnce();
+      expect(fixture.resizeQueryHeight).toHaveBeenCalledWith({
+        type: 'update',
+        sessionId: 30,
+        sequence: 11,
+        deltaY,
+      });
+    }
+  });
+
+  it('fails closed for malformed layout and out-of-range resize payloads', () => {
     const fixture = createControllerFixture();
     registerOverlayIpc(() => fixture.controller);
 
@@ -255,19 +364,21 @@ describe('overlay query layout IPC handlers', () => {
         desiredHeight: Number.POSITIVE_INFINITY,
       },
     );
-    const resizeResult = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(
-      fixture.query.event,
-      {
-        type: 'update',
-        sessionId: 30,
-        sequence: 11,
-        deltaY: 4097,
-      },
-    );
-
     expectRejectedAck(layoutResult, { sessionId: 0, sequence: 0 });
-    expectRejectedAck(resizeResult, { sessionId: 0, sequence: 0 });
     expect(fixture.reportQueryLayout).not.toHaveBeenCalled();
+
+    for (const deltaY of [-4097, -0.5, 0.5, 4097, Number.POSITIVE_INFINITY, Number.NaN, '12']) {
+      const resizeResult = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(
+        fixture.query.event,
+        {
+          type: 'update',
+          sessionId: 30,
+          sequence: 11,
+          deltaY,
+        },
+      );
+      expectRejectedAck(resizeResult, { sessionId: 0, sequence: 0 });
+    }
     expect(fixture.resizeQueryHeight).not.toHaveBeenCalled();
   });
 

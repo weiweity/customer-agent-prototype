@@ -4,6 +4,7 @@ import {
   isFoxDragSettleAck,
   isFoxVisualTransform,
   isOverlayCommand,
+  selectAuthoritativeFoxDockSnapshot,
 } from '../../src/shared/overlay-events';
 
 describe('overlay command boundary', () => {
@@ -11,14 +12,38 @@ describe('overlay command boundary', () => {
     expect(isFoxDragSettleAck({
       edge: 'left',
       epoch: 4,
-      openSearchRequested: false,
+      settleId: 9,
+      generation: 2,
     })).toBe(true);
     expect(isFoxDragSettleAck({ edge: 'left', epoch: 4 })).toBe(false);
     expect(isFoxDragSettleAck({
       edge: 'outside',
       epoch: 4,
-      openSearchRequested: false,
+      settleId: 9,
+      generation: 2,
     })).toBe(false);
+    expect(isFoxDragSettleAck({ edge: 'left', epoch: 4, settleId: 0, generation: 2 })).toBe(false);
+    expect(isFoxDragSettleAck({ edge: 'left', epoch: 4, settleId: 9, generation: 0 })).toBe(false);
+  });
+
+  it('selects the latest fox dock snapshot and keeps a tied preferred ACK', () => {
+    expect(selectAuthoritativeFoxDockSnapshot(
+      { edge: 'left', epoch: 11 },
+      { edge: 'right', epoch: 10 },
+    )).toEqual({ edge: 'left', epoch: 11 });
+    expect(selectAuthoritativeFoxDockSnapshot(
+      { edge: 'left', epoch: 11 },
+      { edge: 'right', epoch: 11 },
+    )).toEqual({ edge: 'left', epoch: 11 });
+    expect(selectAuthoritativeFoxDockSnapshot(
+      { edge: 'left', epoch: 11 },
+      { edge: 'right', epoch: 12 },
+    )).toEqual({ edge: 'right', epoch: 12 });
+    expect(selectAuthoritativeFoxDockSnapshot(null, { edge: 'right', epoch: 8 })).toEqual({
+      edge: 'right',
+      epoch: 8,
+    });
+    expect(selectAuthoritativeFoxDockSnapshot(undefined)).toBeNull();
   });
 
   it('requires explicit animation intent and an anchor for chrome handoffs', () => {
@@ -72,6 +97,13 @@ describe('overlay command boundary', () => {
       width: 800,
     })).toBe(false);
     expect(isOverlayCommand({ type: 'sync-fox-edge', edge: 'right', epoch: 3 })).toBe(true);
+    expect(isOverlayCommand({
+      type: 'fox-drag-settled',
+      edge: 'right',
+      epoch: 4,
+      settleId: 3,
+      generation: 2,
+    })).toBe(true);
     expect(isOverlayCommand({ type: 'sync-query-anchor', anchor: 'right' })).toBe(true);
 
     expect(isOverlayCommand({ type: 'activate-search', anchor: 'left' })).toBe(false);
@@ -106,6 +138,13 @@ describe('overlay command boundary', () => {
     expect(isOverlayCommand({ type: 'collapse', anchor: 'right', dockEdge: 'none', animate: 'yes' })).toBe(false);
     expect(isOverlayCommand({ type: 'collapse', anchor: 'right', dockEdge: 'outside', animate: true })).toBe(false);
     expect(isOverlayCommand({ type: 'sync-fox-edge', edge: 'outside', epoch: 3 })).toBe(false);
+    expect(isOverlayCommand({
+      type: 'fox-drag-settled',
+      edge: 'right',
+      epoch: 4,
+      settleId: 0,
+      generation: 2,
+    })).toBe(false);
     expect(isOverlayCommand({ type: 'sync-query-anchor', anchor: 'center' })).toBe(false);
   });
 

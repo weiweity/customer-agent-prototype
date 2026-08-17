@@ -87,4 +87,20 @@ describe('loadRenderer', () => {
     expect(loadURL).not.toHaveBeenCalled();
     expect(loadFile).not.toHaveBeenCalled();
   });
+
+  it('returns cancelled when shutdown starts after a deferred successful load', async () => {
+    let cancelled = false;
+    let resolveLoad!: () => void;
+    const { win, loadURL } = createWindow({
+      loadUrl: () => new Promise<void>((resolve) => {
+        resolveLoad = resolve;
+      }),
+    });
+
+    const pending = loadRenderer(win, 'dashboard', 'http://127.0.0.1:5173/', () => cancelled);
+    expect(loadURL).toHaveBeenCalledOnce();
+    cancelled = true;
+    resolveLoad();
+    await expect(pending).resolves.toBe('cancelled');
+  });
 });

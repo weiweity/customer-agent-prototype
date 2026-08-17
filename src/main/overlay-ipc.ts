@@ -1,5 +1,10 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
-import { canOpenDashboard } from '../shared/dashboard-access';
+import {
+  canOpenDashboard,
+  isOpenDashboardResult,
+  openDashboardUnavailable,
+  type OpenDashboardResult,
+} from '../shared/dashboard-access';
 import {
   canReportQueryLayout,
   canReportUiPhase,
@@ -14,6 +19,8 @@ import {
 } from '../shared/query-layout';
 import {
   canRequestFoxPeek,
+  isFoxDragGeneration,
+  isFoxDragSettleId,
   isFoxPeekEpoch,
   isFoxVisualTransform,
   isHandoffId,
@@ -88,10 +95,10 @@ export function registerOverlayIpc(getController: () => OverlayController | null
     controller.openSearch();
   });
 
-  ipcMain.handle(IPC_CHANNELS.OPEN_DASHBOARD, async (event): Promise<void> => {
+  ipcMain.handle(IPC_CHANNELS.OPEN_DASHBOARD, async (event): Promise<OpenDashboardResult> => {
     const controller = getController();
     if (!controller) {
-      return;
+      return openDashboardUnavailable();
     }
     const trusted = isTrustedSender(
       event,
@@ -100,13 +107,21 @@ export function registerOverlayIpc(getController: () => OverlayController | null
     );
     const role = controller.overlayRoleOf(event.sender);
     if (!canOpenDashboard({ trusted, role })) {
-      return;
+      return openDashboardUnavailable();
     }
     try {
-      await controller.openDashboard();
+      const result = await controller.openDashboard();
+      if (isOpenDashboardResult(result)) {
+        if (!result.ok) {
+          console.error('[dashboard] IPC 打开工作台失败。', result.message);
+        }
+        return result;
+      }
+      console.error('[dashboard] IPC 打开工作台失败。', result);
+      return openDashboardUnavailable();
     } catch (error: unknown) {
       console.error('[dashboard] IPC 打开工作台失败。', error);
-      throw error;
+      return openDashboardUnavailable();
     }
   });
 
@@ -202,11 +217,59 @@ export function registerOverlayIpc(getController: () => OverlayController | null
 
   ipcMain.handle(
     IPC_CHANNELS.MOVE_FOX_BY,
-    (event, dx: unknown, dy: unknown, finished: unknown): FoxDragSettleAck | null => {
+    (
+      event,
+      dx: unknown,
+      dy: unknown,
+      finished: unknown,
+      generation: unknown,
+    ): FoxDragSettleAck | null => {
       if (typeof finished !== 'boolean') {
         return null;
       }
-      return guard(event)?.moveBy(dx, dy, finished) ?? null;
+      const controller = guard(event);
+      if (!controller) {
+        return null;
+      }
+      const role = controller.overlayRoleOf(event.sender);
+      if (role === 'fox') {
+        if (!isFoxDragGeneration(generation) && !controller.testHarness) {
+          return null;
+        }
+        return controller.moveBy(
+          dx,
+          dy,
+          finished,
+          isFoxDragGeneration(generation) ? generation : undefined,
+        );
+      }
+      if (role !== 'query') {
+        return null;
+      }
+      return controller.moveBy(dx, dy, finished);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.COMMIT_FOX_DRAG_SETTLE,
+    (event, settleId: unknown): void => {
+      const controller = getController();
+      if (!controller) {
+        return;
+      }
+      const trusted = isTrustedMainFrameSender(
+        event,
+        controller.trustedContents(),
+        controller.rendererDevServerUrl,
+      );
+      if (
+        !trusted
+        || controller.overlayRoleOf(event.sender) !== 'fox'
+        || !isFoxDragSettleId(settleId)
+      ) {
+        return;
+      }
+      controller.commitFoxDragSettle(settleId);
     },
   );
 

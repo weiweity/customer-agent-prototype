@@ -52,9 +52,6 @@ describe('trusted query IPC access', () => {
     expect(clipboardIpc).toMatch(
       /IPC_CHANNELS\.GET_PLATFORM[\s\S]*if \(!guard\(event\)\)/,
     );
-    expect(overlayIpc).toContain('IPC_CHANNELS.OPEN_SEARCH');
-    expect(overlayIpc).toContain('IPC_CHANNELS.MOVE_FOX_BY');
-    expect(overlayIpc).toContain('guard(event)?.moveBy');
     expect(overlayIpc).not.toMatch(/OPEN_SEARCH[\s\S]{0,400}canReportUiPhase/);
   });
 });

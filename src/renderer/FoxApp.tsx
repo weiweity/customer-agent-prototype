@@ -5,6 +5,7 @@ import {
   isFoxVisualTransform,
   type FoxDockEdge,
   type FoxDragSettleAck,
+  selectAuthoritativeFoxDockSnapshot,
   type FoxPeekIntent,
   type FoxVisualTransform,
 } from '@shared/overlay-events';
@@ -118,9 +119,13 @@ export function FoxApp() {
   const settlingRef = useRef(false);
   const [settling, setSettling] = useState(false);
   const dragGenerationRef = useRef(0);
+  const nativeDragGenerationRef = useRef(0);
+  const gestureActiveRef = useRef(false);
+  const deferredFinalSettleRef = useRef<FoxDragSettleAck | null>(null);
+  const lastCommittedSettleIdRef = useRef(0);
+  const mountedRef = useRef(true);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const openSearchActionRef = useRef<() => void>(() => undefined);
   const openingSearchRef = useRef(false);
   const dragRafRef = useRef<number | null>(null);
   const pendingDragRef = useRef<ReturnType<typeof computeDragReaction> | null>(null);
@@ -311,14 +316,33 @@ export function FoxApp() {
     setRetracting(false);
   }, []);
 
-  const commitDragSettleAck = useCallback((ack: FoxDragSettleAck, generation: number): void => {
-    if (generation !== dragGenerationRef.current || !settlingRef.current) {
+  const commitDragSettleAck = useCallback((ack: FoxDragSettleAck): void => {
+    if (
+      !mountedRef.current
+      || ack.settleId <= lastCommittedSettleIdRef.current
+      || ack.generation !== nativeDragGenerationRef.current
+    ) {
       return;
     }
+    if (gestureActiveRef.current) {
+      const deferred = deferredFinalSettleRef.current;
+      if (!deferred || ack.settleId > deferred.settleId) {
+        deferredFinalSettleRef.current = ack;
+      }
+      return;
+    }
+    lastCommittedSettleIdRef.current = ack.settleId;
+    deferredFinalSettleRef.current = null;
     const pendingSync = pendingDragSyncRef.current;
+    const pendingEcho = pendingDragEchoRef.current;
     pendingDragSyncRef.current = null;
     pendingDragEchoRef.current = null;
-    const finalSnapshot = pendingSync && pendingSync.epoch >= ack.epoch ? pendingSync : ack;
+    const finalSnapshot = selectAuthoritativeFoxDockSnapshot(
+      ack,
+      pendingSync,
+      pendingEcho,
+      { edge: dockEdgeRef.current, epoch: peekEpochRef.current },
+    ) ?? ack;
     const finalEdge = finalSnapshot.edge;
     const finalEpoch = finalSnapshot.epoch;
     const previousEdge = dockEdgeRef.current;
@@ -351,13 +375,11 @@ export function FoxApp() {
     });
     resetFollow();
     wake();
-    if (ack.openSearchRequested) {
-      queueMicrotask(() => {
-        if (generation === dragGenerationRef.current) {
-          openSearchActionRef.current();
-        }
-      });
-    }
+    // Main owns the pending shortcut intent. This Fox-only commit releases the
+    // native settle fence only after the renderer has painted the same frame.
+    void window.customerAgent?.commitFoxDragSettle(ack.settleId).catch(() => {
+      // Fail closed: without a successful commit Main keeps Query handoff fenced.
+    });
   }, [cancelDragRaf, clearAnnoyedDragTimer, clearSettleWatchdog, resetFollow, wake]);
 
   const abortDragSettle = useCallback((generation: number): void => {
@@ -366,11 +388,9 @@ export function FoxApp() {
     }
     const pendingSync = pendingDragSyncRef.current;
     const pendingEcho = pendingDragEchoRef.current;
-    const pendingEdge = !pendingSync
-      ? pendingEcho
-      : !pendingEcho || pendingSync.epoch >= pendingEcho.epoch
-        ? pendingSync
-        : pendingEcho;
+    pendingDragSyncRef.current = null;
+    pendingDragEchoRef.current = null;
+    const pendingEdge = selectAuthoritativeFoxDockSnapshot(pendingSync, pendingEcho);
     const previousEdge = dockEdgeRef.current;
     clearSettleWatchdog();
     clearAnnoyedDragTimer();
@@ -401,6 +421,7 @@ export function FoxApp() {
   }, [clearAnnoyedDragTimer, clearSettleWatchdog, publishTransient, resetDragVars, resetFollow, wake]);
 
   useEffect(() => {
+    mountedRef.current = true;
     const api = window.customerAgent;
     if (!api) {
       setShortcutFailed(true);
@@ -425,6 +446,10 @@ export function FoxApp() {
         setShortcutFailed(true);
         setHint(command.message);
       }
+      if (command.type === 'fox-drag-settled') {
+        commitDragSettleAck(command);
+        return;
+      }
       if (command.type === 'fox-edge' || command.type === 'sync-fox-edge') {
         const hasLiveSession = dragSessionRef.current !== null || settlingRef.current;
         if (hasLiveSession) {
@@ -432,12 +457,21 @@ export function FoxApp() {
           // active. Only the finished IPC acknowledgement may atomically clear
           // the renderer crop compensation; a late ordinary echo must not be
           // mistaken for the final settle.
-          peekEpochRef.current = command.epoch;
+          peekEpochRef.current = Math.max(peekEpochRef.current, command.epoch);
           if (command.type === 'sync-fox-edge') {
-            pendingDragSyncRef.current = { edge: command.edge, epoch: command.epoch };
+            pendingDragSyncRef.current = selectAuthoritativeFoxDockSnapshot(
+              pendingDragSyncRef.current,
+              { edge: command.edge, epoch: command.epoch },
+            );
           } else {
-            pendingDragEchoRef.current = { edge: command.edge, epoch: command.epoch };
+            pendingDragEchoRef.current = selectAuthoritativeFoxDockSnapshot(
+              pendingDragEchoRef.current,
+              { edge: command.edge, epoch: command.epoch },
+            );
           }
+          return;
+        }
+        if (command.epoch <= peekEpochRef.current) {
           return;
         }
         openingSearchRef.current = false;
@@ -474,6 +508,12 @@ export function FoxApp() {
       }
     });
     return () => {
+      mountedRef.current = false;
+      dragGenerationRef.current += 1;
+      nativeDragGenerationRef.current = 0;
+      gestureActiveRef.current = false;
+      deferredFinalSettleRef.current = null;
+      settlingRef.current = false;
       clearRetractTimer();
       clearAnnoyedDragTimer();
       clearSettleWatchdog();
@@ -485,6 +525,7 @@ export function FoxApp() {
     clearAnnoyedDragTimer,
     clearRetractTimer,
     clearSettleWatchdog,
+    commitDragSettleAck,
     publishTransient,
     resetDragVars,
     resetFollow,
@@ -590,7 +631,6 @@ export function FoxApp() {
       void api.setFoxPeek('retract', epoch);
     });
   }, [clearRetractTimer, resetFollow, resetPeekVisualState, wake]);
-  openSearchActionRef.current = openSearch;
 
   const finishRetract = useCallback(
     (epoch: number) => {
@@ -637,7 +677,7 @@ export function FoxApp() {
       const generation = dragGenerationRef.current;
       let request: Promise<FoxDragSettleAck | null> | undefined;
       try {
-        request = api?.moveFoxBy(dx, dy, finished);
+        request = api?.moveFoxBy(dx, dy, finished, generation);
       } catch {
         if (finished) {
           queueMicrotask(() => abortDragSettle(generation));
@@ -656,7 +696,7 @@ export function FoxApp() {
       void Promise.resolve(request ?? null)
         .then((ack) => {
           if (ack) {
-            commitDragSettleAck(ack, generation);
+            commitDragSettleAck(ack);
           } else {
             abortDragSettle(generation);
           }
@@ -666,6 +706,7 @@ export function FoxApp() {
     openSearch,
     {
       onPressStart() {
+        gestureActiveRef.current = true;
         if (settlingRef.current) {
           abortDragSettle(dragGenerationRef.current);
         }
@@ -676,15 +717,17 @@ export function FoxApp() {
           setKeyboardFocus(false);
         });
         startDockDragSession();
-        if (reducedMotion) {
-          return;
-        }
         clearAnnoyedDragTimer();
         wake();
         resetFollow();
         publishTransient('pressed', true);
+        if (reducedMotion) {
+          return;
+        }
       },
       onGestureSample(sample) {
+        nativeDragGenerationRef.current = dragGenerationRef.current;
+        deferredFinalSettleRef.current = null;
         startDockDragSession();
         const session = dragSessionRef.current;
         if (session && foxDragInwardPx(session.edge, sample.totalDx) > 0 && dockEdgeRef.current !== 'none') {
@@ -701,6 +744,9 @@ export function FoxApp() {
         }
         applyDragSessionOffset(sample.totalDx);
         suppressPeekUntilLeave();
+        wake();
+        resetFollow();
+        publishTransient('dragging', true);
         if (reducedMotion) {
           return;
         }
@@ -716,7 +762,6 @@ export function FoxApp() {
           publishTransient('annoyed-drag', true);
           return;
         }
-        publishTransient('dragging', true);
         if (annoyedDragTimerRef.current === null) {
           annoyedDragTimerRef.current = window.setTimeout(() => {
             annoyedDragTimerRef.current = null;
@@ -727,13 +772,20 @@ export function FoxApp() {
         }
       },
       onGestureEnd({ moved }) {
+        gestureActiveRef.current = false;
         clearAnnoyedDragTimer();
         cancelDragRaf();
         publishTransient('none', true);
         if (!moved) {
           resetDragVars();
+          const deferred = deferredFinalSettleRef.current;
+          deferredFinalSettleRef.current = null;
+          if (deferred) {
+            commitDragSettleAck(deferred);
+          }
           return;
         }
+        deferredFinalSettleRef.current = null;
         beginPendingSettle();
       },
     },

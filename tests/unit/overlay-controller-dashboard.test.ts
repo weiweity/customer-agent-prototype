@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrowserWindow } from 'electron';
 
 const mocks = vi.hoisted(() => ({
@@ -47,6 +47,8 @@ vi.mock('../../src/main/overlay-test-harness', () => ({
 }));
 
 import { OverlayController } from '../../src/main/overlay-controller';
+import { createShutdownFence } from '../../src/main/shutdown-fence';
+import { OPEN_DASHBOARD_FAILURE_MESSAGE } from '../../src/shared/dashboard-access';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -87,13 +89,20 @@ function createWindowFixture() {
   return win as unknown as BrowserWindow & {
     destroy: ReturnType<typeof vi.fn>;
     focus: ReturnType<typeof vi.fn>;
+    isMinimized: ReturnType<typeof vi.fn>;
+    restore: ReturnType<typeof vi.fn>;
     show: ReturnType<typeof vi.fn>;
   };
 }
 
 describe('OverlayController dashboard opening', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('awaits one renderer load before showing a singleton dashboard', async () => {
@@ -114,13 +123,106 @@ describe('OverlayController dashboard opening', () => {
     expect(dismissSpy).not.toHaveBeenCalled();
 
     load.resolve('loaded');
-    await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
+    await expect(Promise.all([first, second])).resolves.toEqual([{ ok: true }, { ok: true }]);
     expect(dismissSpy).toHaveBeenCalledOnce();
     expect(win.show).toHaveBeenCalledOnce();
     expect(win.focus).toHaveBeenCalledOnce();
+    expect(win.focus.mock.invocationCallOrder[0]).toBeLessThan(
+      dismissSpy.mock.invocationCallOrder[0]!,
+    );
   });
 
-  it('rejects every concurrent caller and destroys the hidden window when loading fails', async () => {
+  it('restores an existing dashboard and dismisses Query only after reveal succeeds', async () => {
+    const win = createWindowFixture();
+    mocks.createDashboardBrowserWindow.mockReturnValue(win);
+    mocks.loadRenderer.mockResolvedValue('loaded');
+    const controller = new OverlayController();
+    const dismissSpy = vi.spyOn(controller, 'dismiss');
+
+    await expect(controller.openDashboard()).resolves.toEqual({ ok: true });
+    vi.clearAllMocks();
+    dismissSpy.mockClear();
+    win.isMinimized.mockReturnValue(true);
+
+    await expect(controller.openDashboard()).resolves.toEqual({ ok: true });
+
+    expect(mocks.createDashboardBrowserWindow).not.toHaveBeenCalled();
+    expect(mocks.loadRenderer).not.toHaveBeenCalled();
+    expect(win.restore).toHaveBeenCalledOnce();
+    expect(win.show).toHaveBeenCalledOnce();
+    expect(win.focus).toHaveBeenCalledOnce();
+    expect(dismissSpy).toHaveBeenCalledOnce();
+    expect(win.restore.mock.invocationCallOrder[0]).toBeLessThan(win.show.mock.invocationCallOrder[0]!);
+    expect(win.show.mock.invocationCallOrder[0]).toBeLessThan(win.focus.mock.invocationCallOrder[0]!);
+    expect(win.focus.mock.invocationCallOrder[0]).toBeLessThan(
+      dismissSpy.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it.each(['restore', 'show', 'focus'] as const)(
+    'keeps Query available and abandons an existing dashboard when %s throws',
+    async (method) => {
+      const win = createWindowFixture();
+      const retryWin = createWindowFixture();
+      mocks.createDashboardBrowserWindow.mockReturnValueOnce(win).mockReturnValueOnce(retryWin);
+      mocks.loadRenderer.mockResolvedValue('loaded');
+      const controller = new OverlayController();
+      const dismissSpy = vi.spyOn(controller, 'dismiss');
+
+      await expect(controller.openDashboard()).resolves.toEqual({ ok: true });
+      dismissSpy.mockClear();
+      win.isMinimized.mockReturnValue(method === 'restore');
+      win[method].mockImplementationOnce(() => {
+        throw new Error(`${method} failed`);
+      });
+
+      await expect(controller.openDashboard()).resolves.toEqual({
+        ok: false,
+        message: OPEN_DASHBOARD_FAILURE_MESSAGE,
+      });
+      expect(dismissSpy).not.toHaveBeenCalled();
+      expect(win.destroy).toHaveBeenCalledOnce();
+
+      await expect(controller.openDashboard()).resolves.toEqual({ ok: true });
+      expect(mocks.createDashboardBrowserWindow).toHaveBeenCalledTimes(2);
+      expect(retryWin.show).toHaveBeenCalledOnce();
+      expect(retryWin.focus).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(['show', 'focus'] as const)(
+    'returns one typed failure to concurrent callers when a new dashboard %s throws',
+    async (method) => {
+      const load = deferred<'loaded' | 'cancelled'>();
+      const win = createWindowFixture();
+      const retryWin = createWindowFixture();
+      win[method].mockImplementationOnce(() => {
+        throw new Error(`${method} failed`);
+      });
+      mocks.createDashboardBrowserWindow.mockReturnValueOnce(win).mockReturnValueOnce(retryWin);
+      mocks.loadRenderer.mockReturnValueOnce(load.promise).mockResolvedValueOnce('loaded');
+      const controller = new OverlayController();
+      const dismissSpy = vi.spyOn(controller, 'dismiss');
+
+      const first = controller.openDashboard();
+      const second = controller.openDashboard();
+      load.resolve('loaded');
+
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        { ok: false, message: OPEN_DASHBOARD_FAILURE_MESSAGE },
+        { ok: false, message: OPEN_DASHBOARD_FAILURE_MESSAGE },
+      ]);
+      expect(dismissSpy).not.toHaveBeenCalled();
+      expect(win.destroy).toHaveBeenCalledOnce();
+
+      await expect(controller.openDashboard()).resolves.toEqual({ ok: true });
+      expect(mocks.createDashboardBrowserWindow).toHaveBeenCalledTimes(2);
+      expect(retryWin.show).toHaveBeenCalledOnce();
+      expect(retryWin.focus).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('fails every concurrent caller and destroys the hidden window when loading fails', async () => {
     const load = deferred<'loaded' | 'cancelled'>();
     const win = createWindowFixture();
     mocks.createDashboardBrowserWindow.mockReturnValue(win);
@@ -133,8 +235,8 @@ describe('OverlayController dashboard opening', () => {
     expect(dismissSpy).not.toHaveBeenCalled();
     load.reject(new Error('renderer failed'));
 
-    await expect(first).rejects.toThrow('renderer failed');
-    await expect(second).rejects.toThrow('renderer failed');
+    await expect(first).resolves.toEqual({ ok: false, message: OPEN_DASHBOARD_FAILURE_MESSAGE });
+    await expect(second).resolves.toEqual({ ok: false, message: OPEN_DASHBOARD_FAILURE_MESSAGE });
     expect(dismissSpy).not.toHaveBeenCalled();
     expect(win.destroy).toHaveBeenCalledOnce();
     expect(win.show).not.toHaveBeenCalled();
@@ -151,9 +253,51 @@ describe('OverlayController dashboard opening', () => {
     expect(dismissSpy).not.toHaveBeenCalled();
 
     retryLoad.resolve('loaded');
-    await expect(retry).resolves.toBeUndefined();
+    await expect(retry).resolves.toEqual({ ok: true });
     expect(dismissSpy).toHaveBeenCalledOnce();
     expect(retryWin.show).toHaveBeenCalledOnce();
     expect(retryWin.focus).toHaveBeenCalledOnce();
+  });
+
+  it('fails every concurrent caller and cleans the hidden window when a deferred load is cancelled', async () => {
+    const load = deferred<'loaded' | 'cancelled'>();
+    const win = createWindowFixture();
+    mocks.createDashboardBrowserWindow.mockReturnValue(win);
+    mocks.loadRenderer.mockReturnValue(load.promise);
+    const controller = new OverlayController();
+    const dismissSpy = vi.spyOn(controller, 'dismiss');
+
+    const first = controller.openDashboard();
+    const second = controller.openDashboard();
+    expect(win.show).not.toHaveBeenCalled();
+    load.resolve('cancelled');
+
+    await expect(first).resolves.toEqual({ ok: false, message: OPEN_DASHBOARD_FAILURE_MESSAGE });
+    await expect(second).resolves.toEqual({ ok: false, message: OPEN_DASHBOARD_FAILURE_MESSAGE });
+    expect(dismissSpy).not.toHaveBeenCalled();
+    expect(win.destroy).toHaveBeenCalledOnce();
+    expect(win.show).not.toHaveBeenCalled();
+
+    const retryLoad = deferred<'loaded' | 'cancelled'>();
+    const retryWin = createWindowFixture();
+    mocks.createDashboardBrowserWindow.mockReturnValueOnce(retryWin);
+    mocks.loadRenderer.mockReturnValueOnce(retryLoad.promise);
+    const retry = controller.openDashboard();
+    retryLoad.resolve('loaded');
+    await expect(retry).resolves.toEqual({ ok: true });
+    expect(retryWin.show).toHaveBeenCalledOnce();
+  });
+
+  it('does not create a window after shutdown', async () => {
+    const fence = createShutdownFence();
+    fence.begin();
+    const controller = new OverlayController({ fence });
+
+    await expect(controller.openDashboard()).resolves.toEqual({
+      ok: false,
+      message: OPEN_DASHBOARD_FAILURE_MESSAGE,
+    });
+    expect(mocks.createDashboardBrowserWindow).not.toHaveBeenCalled();
+    expect(mocks.loadRenderer).not.toHaveBeenCalled();
   });
 });

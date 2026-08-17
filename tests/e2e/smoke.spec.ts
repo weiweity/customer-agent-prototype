@@ -1254,7 +1254,10 @@ test('@float adopts a WindowServer stage boundary without hover/retract native d
 
     await fox.evaluate(async () => {
       await window.customerAgent?.moveFoxBy(0, 12, false);
-      await window.customerAgent?.moveFoxBy(0, 0, true);
+      const settled = await window.customerAgent?.moveFoxBy(0, 0, true);
+      if (settled) {
+        await window.customerAgent?.commitFoxDragSettle(settled.settleId);
+      }
     });
     const stageDragged = { ...stageSeated, y: stageSeated.y + 12, visible: true };
     await expect.poll(async () => readFoxNativeBounds(app)).toEqual(stageDragged);
@@ -1501,6 +1504,7 @@ test('@float keeps native fox bounds still during local follow, sleep, and press
       }, edge);
       await expect(fox.getByTestId('fox-idle')).toHaveAttribute('data-dock-edge', edge);
       await expect(fox.getByTestId('fox-idle')).toHaveAttribute('data-snapping', 'false');
+      await parkFoxPointerOutside(app, fox);
       const docked = await readFoxNativeBounds(app);
       expect(docked?.width).toBe(FOX_SIZE);
       expect(docked?.height).toBe(FOX_SIZE);
@@ -1897,9 +1901,10 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
       fire('pointerup', { buttons: 0, screenX: 56 });
       return { afterMove, afterEcho };
     });
-    expect(reduced.afterMove.transient).toBe('none');
+    expect(reduced.afterMove.transient).toBe('dragging');
     expect(reduced.afterMove.session).toBe('left');
     expect(Number.parseFloat(reduced.afterMove.sessionX)).toBeLessThan(0);
+    expect(reduced.afterEcho.transient).toBe('dragging');
     expect(reduced.afterEcho.session).toBe('left');
     expect(reduced.afterEcho.sessionX).toBe(reduced.afterMove.sessionX);
   } finally {

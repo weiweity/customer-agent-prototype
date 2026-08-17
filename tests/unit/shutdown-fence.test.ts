@@ -94,9 +94,8 @@ describe('overlay shutdown contract', () => {
     expect(controller).toMatch(
       /loadState = await loadRenderer\(\s*win,\s*'dashboard',\s*this\.rendererDevServerUrl,/,
     );
-    expect(controller).toMatch(
-      /catch \(error\) \{\s*if \(this\.dashboard === win\) \{\s*this\.dashboard = null;\s*\}\s*if \(!win\.isDestroyed\(\)\) \{\s*win\.destroy\(\);/,
-    );
+    expect(controller).toContain('this.abandonDashboardWindow(win)');
+    expect(controller).toContain('private abandonDashboardWindow');
     expect(controller).not.toContain('skipTransformProcessType: true');
     expect(controller).not.toContain('setVisibleOnAllWorkspaces(');
     expect(controller).toContain('this.scheduler.dispose()');
