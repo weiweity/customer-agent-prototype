@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyMacPackageBrandGate } from './mac-package-brand-gate.mjs';
 
 const mode = process.argv[2];
 if (mode !== 'local' && mode !== 'distribution') {
@@ -51,25 +51,8 @@ for (const relativePath of [
   }
 }
 
-const iconFile = execFileSync('/usr/bin/plutil', ['-extract', 'CFBundleIconFile', 'raw', infoPlist], {
-  encoding: 'utf8',
-}).trim();
-const normalizedIconFile = iconFile.endsWith('.icns') ? iconFile : `${iconFile}.icns`;
-if (normalizedIconFile !== 'icon.icns') {
-  throw new Error(`CFBundleIconFile must reference the generated brand icon, received: ${iconFile}`);
-}
-const resourcesIcon = path.join(resources, normalizedIconFile);
 const expectedBrandIcon = path.join(root, 'build', 'icon.icns');
-if (!existsSync(resourcesIcon) || statSync(resourcesIcon).size === 0) {
-  throw new Error('Packaged macOS resources must include icon.icns');
-}
-if (!existsSync(expectedBrandIcon) || statSync(expectedBrandIcon).size === 0) {
-  throw new Error('Generated build/icon.icns is required for package verification');
-}
-const sha256 = (filePath) => createHash('sha256').update(readFileSync(filePath)).digest('hex');
-if (sha256(resourcesIcon) !== sha256(expectedBrandIcon)) {
-  throw new Error('Packaged icon.icns does not match the generated brand icon');
-}
+verifyMacPackageBrandGate({ infoPlist, resourcesDirectory: resources, expectedBrandIcon });
 
 for (const forbiddenKey of [
   'LSUIElement',

@@ -596,6 +596,75 @@ describe('FoxApp', () => {
     dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 31, screenX: 24, screenY: 20 });
   });
 
+  it('ignores drag A ACK while drag B is settling and only commits drag B', async () => {
+    const finishedResolvers: Array<(ack: FoxDragSettleAck | null) => void> = [];
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>((resolve) => {
+        finishedResolvers.push(resolve);
+      });
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 32,
+      screenX: 20,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 32,
+      screenX: 50,
+      screenY: 28,
+    });
+    act(() => {
+      dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 32, screenX: 50, screenY: 28 });
+    });
+    expect(finishedResolvers).toHaveLength(1);
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 33,
+      screenX: 24,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 33,
+      screenX: 58,
+      screenY: 26,
+    });
+    act(() => {
+      dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 33, screenX: 58, screenY: 26 });
+    });
+    expect(finishedResolvers).toHaveLength(2);
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+
+    await act(async () => {
+      finishedResolvers[0]?.({ edge: 'right', epoch: 70, openSearchRequested: true });
+      await Promise.resolve();
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+    expect(idle).toHaveAttribute('data-dock-edge', 'none');
+    expect(openSearch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      finishedResolvers[1]?.({ edge: 'left', epoch: 71, openSearchRequested: false });
+      await Promise.resolve();
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    expect(idle).toHaveAttribute('data-dock-edge', 'left');
+    expect(openSearch).not.toHaveBeenCalled();
+  });
+
   it('does not fall asleep after being hidden and restarts the clock when visible again', () => {
     vi.useFakeTimers();
     try {

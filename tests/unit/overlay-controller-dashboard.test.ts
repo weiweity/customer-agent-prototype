@@ -102,6 +102,7 @@ describe('OverlayController dashboard opening', () => {
     mocks.createDashboardBrowserWindow.mockReturnValue(win);
     mocks.loadRenderer.mockReturnValue(load.promise);
     const controller = new OverlayController();
+    const dismissSpy = vi.spyOn(controller, 'dismiss');
 
     const first = controller.openDashboard();
     const second = controller.openDashboard();
@@ -110,9 +111,11 @@ describe('OverlayController dashboard opening', () => {
     expect(mocks.loadRenderer).toHaveBeenCalledOnce();
     expect(win.show).not.toHaveBeenCalled();
     expect(win.focus).not.toHaveBeenCalled();
+    expect(dismissSpy).not.toHaveBeenCalled();
 
     load.resolve('loaded');
     await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
+    expect(dismissSpy).toHaveBeenCalledOnce();
     expect(win.show).toHaveBeenCalledOnce();
     expect(win.focus).toHaveBeenCalledOnce();
   });
@@ -123,14 +126,34 @@ describe('OverlayController dashboard opening', () => {
     mocks.createDashboardBrowserWindow.mockReturnValue(win);
     mocks.loadRenderer.mockReturnValue(load.promise);
     const controller = new OverlayController();
+    const dismissSpy = vi.spyOn(controller, 'dismiss');
 
     const first = controller.openDashboard();
     const second = controller.openDashboard();
+    expect(dismissSpy).not.toHaveBeenCalled();
     load.reject(new Error('renderer failed'));
 
     await expect(first).rejects.toThrow('renderer failed');
     await expect(second).rejects.toThrow('renderer failed');
+    expect(dismissSpy).not.toHaveBeenCalled();
     expect(win.destroy).toHaveBeenCalledOnce();
     expect(win.show).not.toHaveBeenCalled();
+
+    const retryLoad = deferred<'loaded' | 'cancelled'>();
+    const retryWin = createWindowFixture();
+    mocks.createDashboardBrowserWindow.mockReturnValueOnce(retryWin);
+    mocks.loadRenderer.mockReturnValueOnce(retryLoad.promise);
+    const retry = controller.openDashboard();
+
+    expect(mocks.createDashboardBrowserWindow).toHaveBeenCalledTimes(2);
+    expect(mocks.loadRenderer).toHaveBeenCalledTimes(2);
+    expect(retryWin.show).not.toHaveBeenCalled();
+    expect(dismissSpy).not.toHaveBeenCalled();
+
+    retryLoad.resolve('loaded');
+    await expect(retry).resolves.toBeUndefined();
+    expect(dismissSpy).toHaveBeenCalledOnce();
+    expect(retryWin.show).toHaveBeenCalledOnce();
+    expect(retryWin.focus).toHaveBeenCalledOnce();
   });
 });

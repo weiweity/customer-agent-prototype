@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { describe, expect, it, vi } from 'vitest';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const packageJson = JSON.parse(
@@ -52,6 +53,50 @@ const packageRunner = readFileSync(
 );
 
 describe('macOS distribution contract', () => {
+  it('executes the packaged brand icon gate against real fixture files', async () => {
+    const verifier = await import(
+      pathToFileURL(path.join(root, 'scripts/mac-package-brand-gate.mjs')).href
+    ) as {
+      verifyMacPackageBrandGate: (input: {
+        infoPlist: string;
+        resourcesDirectory: string;
+        expectedBrandIcon: string;
+        execFile: ReturnType<typeof vi.fn>;
+      }) => string;
+    };
+    const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-mac-icon-'));
+    const resourcesDirectory = path.join(fixtureRoot, 'Resources');
+    const expectedBrandIcon = path.join(fixtureRoot, 'build', 'icon.icns');
+    const packagedIcon = path.join(resourcesDirectory, 'icon.icns');
+    mkdirSync(resourcesDirectory, { recursive: true });
+    mkdirSync(path.dirname(expectedBrandIcon), { recursive: true });
+    writeFileSync(expectedBrandIcon, 'approved-brand-icon');
+    const infoPlist = path.join(fixtureRoot, 'Info.plist');
+    const verify = (iconFile: string): string => verifier.verifyMacPackageBrandGate({
+      infoPlist,
+      resourcesDirectory,
+      expectedBrandIcon,
+      execFile: vi.fn(() => iconFile),
+    });
+
+    try {
+      expect(() => verify('electron.icns')).toThrow(/must reference the generated brand icon/);
+
+      expect(() => verify('icon.icns')).toThrow(/must include icon\.icns/);
+
+      writeFileSync(packagedIcon, '');
+      expect(() => verify('icon.icns')).toThrow(/must include icon\.icns/);
+
+      writeFileSync(packagedIcon, 'wrong-brand-icon');
+      expect(() => verify('icon.icns')).toThrow(/does not match/);
+
+      writeFileSync(packagedIcon, 'approved-brand-icon');
+      expect(verify('icon')).toBe(packagedIcon);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it('builds explicit unsigned local proof packages and fail-closed release packages', () => {
     expect(packageJson.scripts['package:mac:local']).toContain(
       'node scripts/package-macos.mjs local',
@@ -139,9 +184,9 @@ describe('macOS distribution contract', () => {
     expect(packageVerifier).toContain("basename.endsWith('.blockmap')");
     expect(packageFinalizer).toContain("path.basename(relativePath).endsWith('.blockmap')");
     expect(packageFinalizer).toContain("absolutePath.startsWith(`${outputDir}${path.sep}`)");
-    expect(packageVerifier).toContain('CFBundleIconFile');
-    expect(packageVerifier).toContain("normalizedIconFile !== 'icon.icns'");
-    expect(packageVerifier).toContain('sha256(resourcesIcon) !== sha256(expectedBrandIcon)');
+    expect(packageVerifier).toContain(
+      'verifyMacPackageBrandGate({ infoPlist, resourcesDirectory: resources, expectedBrandIcon })',
+    );
     expect(packageVerifier).toContain('LSUIElement');
     expect(packageVerifier).toContain('LSBackgroundOnly');
     expect(packageVerifier).toContain("execFileSync('codesign'");
