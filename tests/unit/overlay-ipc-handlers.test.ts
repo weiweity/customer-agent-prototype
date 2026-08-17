@@ -87,12 +87,14 @@ function createControllerFixture() {
   const resizeQueryHeight = vi.fn((request: QueryResizeRequest) =>
     acceptedAck(request.sessionId, request.sequence, 360),
   );
+  const openDashboard = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const controller = {
     rendererDevServerUrl: DEV_SERVER_URL,
     trustedContents: () => [query.sender, fox.sender, dashboard.sender],
     overlayRoleOf: (sender: WebContents) => roleById.get(sender.id) ?? null,
     reportQueryLayout,
     resizeQueryHeight,
+    openDashboard,
   } as unknown as OverlayController;
 
   return {
@@ -102,6 +104,7 @@ function createControllerFixture() {
     query,
     reportQueryLayout,
     resizeQueryHeight,
+    openDashboard,
   };
 }
 
@@ -123,6 +126,26 @@ describe('overlay query layout IPC handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     electronMocks.handlers.clear();
+  });
+
+  it('awaits dashboard opening and propagates renderer load failures to the trusted query', async () => {
+    const fixture = createControllerFixture();
+    fixture.openDashboard.mockRejectedValueOnce(new Error('dashboard failed'));
+    registerOverlayIpc(() => fixture.controller);
+    const handler = capturedHandler(IPC_CHANNELS.OPEN_DASHBOARD);
+
+    await expect(Promise.resolve(handler(fixture.query.event, undefined))).rejects.toThrow('dashboard failed');
+    expect(fixture.openDashboard).toHaveBeenCalledOnce();
+  });
+
+  it('rejects dashboard opening from an untrusted renderer without invoking the controller', async () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const handler = capturedHandler(IPC_CHANNELS.OPEN_DASHBOARD);
+    const outsider = createSender(99, 'query');
+
+    await expect(Promise.resolve(handler(outsider.event, undefined))).resolves.toBeUndefined();
+    expect(fixture.openDashboard).not.toHaveBeenCalled();
   });
 
   it('forwards a valid layout report from the trusted query main frame', () => {

@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,12 +54,21 @@ for (const relativePath of [
 const iconFile = execFileSync('/usr/bin/plutil', ['-extract', 'CFBundleIconFile', 'raw', infoPlist], {
   encoding: 'utf8',
 }).trim();
-if (!iconFile.includes('icon') && !iconFile.endsWith('.icns') && iconFile !== 'electron.icns') {
-  throw new Error(`CFBundleIconFile is missing a brand icon: ${iconFile}`);
+const normalizedIconFile = iconFile.endsWith('.icns') ? iconFile : `${iconFile}.icns`;
+if (normalizedIconFile !== 'icon.icns') {
+  throw new Error(`CFBundleIconFile must reference the generated brand icon, received: ${iconFile}`);
 }
-const resourcesIcon = path.join(appPath, 'Contents', 'Resources', iconFile.endsWith('.icns') ? iconFile : `${iconFile}.icns`);
-if (!existsSync(resourcesIcon) && !existsSync(path.join(appPath, 'Contents', 'Resources', 'icon.icns'))) {
+const resourcesIcon = path.join(resources, normalizedIconFile);
+const expectedBrandIcon = path.join(root, 'build', 'icon.icns');
+if (!existsSync(resourcesIcon) || statSync(resourcesIcon).size === 0) {
   throw new Error('Packaged macOS resources must include icon.icns');
+}
+if (!existsSync(expectedBrandIcon) || statSync(expectedBrandIcon).size === 0) {
+  throw new Error('Generated build/icon.icns is required for package verification');
+}
+const sha256 = (filePath) => createHash('sha256').update(readFileSync(filePath)).digest('hex');
+if (sha256(resourcesIcon) !== sha256(expectedBrandIcon)) {
+  throw new Error('Packaged icon.icns does not match the generated brand icon');
 }
 
 for (const forbiddenKey of [

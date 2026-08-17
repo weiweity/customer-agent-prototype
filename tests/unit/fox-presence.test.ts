@@ -587,6 +587,7 @@ describe('presence CSS and source contracts', () => {
     expect(queryApp).toContain('query-fox-focus-ring');
     expect(css).not.toContain('box-shadow: 0 0 0 2px var(--focus)');
     expect(css).toMatch(/\.fox-idle\[data-fox-pose='sleeping'\] \.fox-sleep-mark\s*\{[\s\S]*?opacity: 0\.86/);
+    expect(css).toMatch(/\.fox-sleep-mark\s*\{[\s\S]*?font-size: 11px;[\s\S]*?line-height: 11px;/);
     expect(css).toMatch(/\.fox-ground-shadow\s*\{[\s\S]*?opacity: 0\.52/);
     expect(css).toMatch(/\.fox-ground-shadow\s*\{[\s\S]*?transform 300ms[\s\S]*?opacity 300ms/);
     expect(css).toMatch(/\[data-fox-pose='drowsy'\] \.fox-ground-shadow\s*\{[\s\S]*?transition-duration: 280ms/);

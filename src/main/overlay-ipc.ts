@@ -88,7 +88,7 @@ export function registerOverlayIpc(getController: () => OverlayController | null
     controller.openSearch();
   });
 
-  ipcMain.handle(IPC_CHANNELS.OPEN_DASHBOARD, (event): void => {
+  ipcMain.handle(IPC_CHANNELS.OPEN_DASHBOARD, async (event): Promise<void> => {
     const controller = getController();
     if (!controller) {
       return;
@@ -102,9 +102,12 @@ export function registerOverlayIpc(getController: () => OverlayController | null
     if (!canOpenDashboard({ trusted, role })) {
       return;
     }
-    void controller.openDashboard().catch((error: unknown) => {
+    try {
+      await controller.openDashboard();
+    } catch (error: unknown) {
       console.error('[dashboard] IPC 打开工作台失败。', error);
-    });
+      throw error;
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.DISMISS, (event): void => {

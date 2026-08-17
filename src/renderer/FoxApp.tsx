@@ -113,6 +113,7 @@ export function FoxApp() {
   const hoverReleaseRef = useRef(false);
   const dragSessionRef = useRef<{ edge: 'left' | 'right'; cropPx: number } | null>(null);
   const pendingDragSyncRef = useRef<{ edge: FoxDockEdge; epoch: number } | null>(null);
+  const pendingDragEchoRef = useRef<{ edge: FoxDockEdge; epoch: number } | null>(null);
   const [dragSessionEdge, setDragSessionEdge] = useState<'none' | 'left' | 'right'>('none');
   const settlingRef = useRef(false);
   const [settling, setSettling] = useState(false);
@@ -216,6 +217,7 @@ export function FoxApp() {
     writeFoxCssVars(rootRef.current, 'session', null);
     dragSessionRef.current = null;
     pendingDragSyncRef.current = null;
+    pendingDragEchoRef.current = null;
     settlingRef.current = false;
     setDragSessionEdge('none');
     setSettling(false);
@@ -315,8 +317,10 @@ export function FoxApp() {
     }
     const pendingSync = pendingDragSyncRef.current;
     pendingDragSyncRef.current = null;
-    const finalEdge = pendingSync?.edge ?? ack.edge;
-    const finalEpoch = pendingSync?.epoch ?? ack.epoch;
+    pendingDragEchoRef.current = null;
+    const finalSnapshot = pendingSync && pendingSync.epoch >= ack.epoch ? pendingSync : ack;
+    const finalEdge = finalSnapshot.edge;
+    const finalEpoch = finalSnapshot.epoch;
     const previousEdge = dockEdgeRef.current;
     const shouldSnap = finalEdge !== 'none' && finalEdge !== previousEdge;
     clearSettleWatchdog();
@@ -360,10 +364,38 @@ export function FoxApp() {
     if (generation !== dragGenerationRef.current || !settlingRef.current) {
       return;
     }
+    const pendingSync = pendingDragSyncRef.current;
+    const pendingEcho = pendingDragEchoRef.current;
+    const pendingEdge = !pendingSync
+      ? pendingEcho
+      : !pendingEcho || pendingSync.epoch >= pendingEcho.epoch
+        ? pendingSync
+        : pendingEcho;
+    const previousEdge = dockEdgeRef.current;
     clearSettleWatchdog();
     clearAnnoyedDragTimer();
-    publishTransient('none');
     resetDragVars();
+    if (pendingEdge) {
+      const shouldSnap = pendingEdge.edge !== 'none' && pendingEdge.edge !== previousEdge;
+      transientRef.current = 'none';
+      dockEdgeRef.current = pendingEdge.edge;
+      peekEpochRef.current = pendingEdge.epoch;
+      peekIntentRef.current = 'retract';
+      peekingRef.current = false;
+      retractingRef.current = false;
+      flushSync(() => {
+        setTransient('none');
+        setPeeking(false);
+        setRetracting(false);
+        setDockEdge(pendingEdge.edge);
+        setSnapping(shouldSnap);
+        if (shouldSnap) {
+          setSnapToken((current) => current + 1);
+        }
+      });
+    } else {
+      publishTransient('none');
+    }
     resetFollow();
     wake();
   }, [clearAnnoyedDragTimer, clearSettleWatchdog, publishTransient, resetDragVars, resetFollow, wake]);
@@ -403,6 +435,8 @@ export function FoxApp() {
           peekEpochRef.current = command.epoch;
           if (command.type === 'sync-fox-edge') {
             pendingDragSyncRef.current = { edge: command.edge, epoch: command.epoch };
+          } else {
+            pendingDragEchoRef.current = { edge: command.edge, epoch: command.epoch };
           }
           return;
         }
@@ -632,11 +666,11 @@ export function FoxApp() {
     openSearch,
     {
       onPressStart() {
+        if (settlingRef.current) {
+          abortDragSettle(dragGenerationRef.current);
+        }
         dragGenerationRef.current += 1;
         clearSettleWatchdog();
-        if (settlingRef.current) {
-          resetDragVars();
-        }
         pointerFocusLockRef.current = true;
         flushSync(() => {
           setKeyboardFocus(false);

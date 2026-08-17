@@ -879,6 +879,21 @@ describe('QueryApp', () => {
     expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
   });
 
+  it('keeps query usable and offers retry feedback when dashboard opening fails', async () => {
+    const user = userEvent.setup();
+    openDashboard
+      .mockRejectedValueOnce(new Error('dashboard failed'))
+      .mockResolvedValueOnce(undefined);
+    render(<QueryApp />);
+
+    await user.click(screen.getByTestId('open-dashboard'));
+    expect(await screen.findByTestId('error-state')).toHaveTextContent('工作台未打开，请重试');
+    expect(screen.getByTestId('question-input')).toBeVisible();
+
+    await user.click(screen.getByTestId('retry-button'));
+    expect(openDashboard).toHaveBeenCalledTimes(2);
+  });
+
   function openQuerySession(handoffId: number) {
     act(() => {
       for (const listener of commandListeners) {

@@ -93,6 +93,7 @@ export function QueryApp() {
   const composingRef = useRef(false);
   const copyInFlightRef = useRef(false);
   const searchInFlightRef = useRef(false);
+  const dashboardOpenFailedRef = useRef(false);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
   const searchTimerRef = useRef<number | null>(null);
@@ -689,6 +690,7 @@ export function QueryApp() {
   );
 
   const runSearch = useCallback(() => {
+    dashboardOpenFailedRef.current = false;
     if (searchInFlightRef.current) {
       return;
     }
@@ -818,20 +820,36 @@ export function QueryApp() {
     [phase, reportPhase, results.length],
   );
 
+  const openDashboard = useCallback(() => {
+    dashboardOpenFailedRef.current = false;
+    const request = window.customerAgent?.openDashboard();
+    if (!request) {
+      dashboardOpenFailedRef.current = true;
+      setErrorMessage('工作台未打开，请重试。查询窗口仍保持可用。');
+      reportPhase('ERROR', results.length as ResultCount);
+      return;
+    }
+    void request.catch(() => {
+      dashboardOpenFailedRef.current = true;
+      setErrorMessage('工作台未打开，请重试。查询窗口仍保持可用。');
+      reportPhase('ERROR', results.length as ResultCount);
+    });
+  }, [reportPhase, results.length]);
+
   const retry = useCallback(() => {
+    if (dashboardOpenFailedRef.current) {
+      openDashboard();
+      return;
+    }
     if (pendingCopyRef.current && errorMessage.includes('复制')) {
       void copyScript(pendingCopyRef.current);
       return;
     }
     runSearch();
-  }, [copyScript, errorMessage, runSearch]);
+  }, [copyScript, errorMessage, openDashboard, runSearch]);
 
   const dismiss = useCallback(() => {
     void window.customerAgent?.dismiss();
-  }, []);
-
-  const openDashboard = useCallback(() => {
-    void window.customerAgent?.openDashboard();
   }, []);
 
   const drag = useWindowDrag(

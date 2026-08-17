@@ -499,6 +499,103 @@ describe('FoxApp', () => {
     }
   });
 
+  it('commits the buffered normal settle echo when the drag settle watchdog aborts', async () => {
+    vi.useFakeTimers();
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>(() => undefined);
+    });
+    try {
+      render(<FoxApp />);
+      const fox = screen.getByTestId('fox-button');
+      const idle = screen.getByTestId('fox-idle');
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'fox-edge', edge: 'left', epoch: 50 });
+        }
+      });
+      dispatchPointer(fox, 'pointerdown', {
+        button: 0,
+        buttons: 1,
+        pointerId: 29,
+        screenX: 20,
+        screenY: 20,
+      });
+      dispatchPointer(fox, 'pointermove', {
+        button: 0,
+        buttons: 1,
+        pointerId: 29,
+        screenX: 50,
+        screenY: 28,
+      });
+      act(() => {
+        dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 29, screenX: 50, screenY: 28 });
+      });
+      expect(idle).toHaveAttribute('data-fox-settling', 'true');
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'fox-edge', edge: 'right', epoch: 51 });
+        }
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1600);
+      });
+      expect(idle).toHaveAttribute('data-fox-settling', 'false');
+      expect(idle).toHaveAttribute('data-dock-edge', 'right');
+      expect(idle.style.getPropertyValue('--fox-session-x')).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('commits a buffered settle echo before a new pointer generation starts', () => {
+    moveFoxBy.mockImplementation((_dx: number, _dy: number, finished: boolean) => {
+      if (!finished) return Promise.resolve(null);
+      return new Promise<FoxDragSettleAck | null>(() => undefined);
+    });
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+    const idle = screen.getByTestId('fox-idle');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'left', epoch: 60 });
+      }
+    });
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 30,
+      screenX: 20,
+      screenY: 20,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 30,
+      screenX: 50,
+      screenY: 28,
+    });
+    act(() => {
+      dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 30, screenX: 50, screenY: 28 });
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'right', epoch: 61 });
+      }
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'true');
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 31,
+      screenX: 24,
+      screenY: 20,
+    });
+    expect(idle).toHaveAttribute('data-fox-settling', 'false');
+    expect(idle).toHaveAttribute('data-dock-edge', 'right');
+    dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 31, screenX: 24, screenY: 20 });
+  });
+
   it('does not fall asleep after being hidden and restarts the clock when visible again', () => {
     vi.useFakeTimers();
     try {
@@ -1567,7 +1664,7 @@ describe('FoxApp', () => {
       expect(idle).toHaveAttribute('data-fox-settling', 'false');
     });
     expect(idle.style.getPropertyValue('--fox-session-x')).toBe('');
-    expect(idle).toHaveAttribute('data-dock-edge', 'right');
+    expect(idle).toHaveAttribute('data-dock-edge', 'left');
     matchesSpy.mockRestore();
   });
 

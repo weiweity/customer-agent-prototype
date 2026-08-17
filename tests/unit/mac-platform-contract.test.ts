@@ -140,6 +140,8 @@ describe('macOS distribution contract', () => {
     expect(packageFinalizer).toContain("path.basename(relativePath).endsWith('.blockmap')");
     expect(packageFinalizer).toContain("absolutePath.startsWith(`${outputDir}${path.sep}`)");
     expect(packageVerifier).toContain('CFBundleIconFile');
+    expect(packageVerifier).toContain("normalizedIconFile !== 'icon.icns'");
+    expect(packageVerifier).toContain('sha256(resourcesIcon) !== sha256(expectedBrandIcon)');
     expect(packageVerifier).toContain('LSUIElement');
     expect(packageVerifier).toContain('LSBackgroundOnly');
     expect(packageVerifier).toContain("execFileSync('codesign'");

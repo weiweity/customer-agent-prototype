@@ -91,11 +91,12 @@ describe('overlay shutdown contract', () => {
     expect(controller).toContain("Promise<'loaded' | 'cancelled'>");
     expect(controller).toContain("return 'cancelled'");
     expect(controller).toContain("return 'loaded'");
-    expect(controller).toContain(
-      "loadState = await loadRenderer(\n        win,\n        'dashboard',\n        this.rendererDevServerUrl,",
+    expect(controller).toMatch(
+      /loadState = await loadRenderer\(\s*win,\s*'dashboard',\s*this\.rendererDevServerUrl,/,
     );
-    expect(controller).toContain('if (this.dashboard === win) {\n        this.dashboard = null;');
-    expect(controller).toContain('if (!win.isDestroyed()) {\n        win.destroy();');
+    expect(controller).toMatch(
+      /catch \(error\) \{\s*if \(this\.dashboard === win\) \{\s*this\.dashboard = null;\s*\}\s*if \(!win\.isDestroyed\(\)\) \{\s*win\.destroy\(\);/,
+    );
     expect(controller).not.toContain('skipTransformProcessType: true');
     expect(controller).not.toContain('setVisibleOnAllWorkspaces(');
     expect(controller).toContain('this.scheduler.dispose()');

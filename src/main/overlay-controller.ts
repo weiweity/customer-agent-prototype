@@ -148,6 +148,7 @@ export class OverlayController {
     previousManualHeight: number | null;
   } | null = null;
   private queryLayoutFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  private dashboardOpening: Promise<void> | null = null;
   private disposed = false;
   private readonly fence: ShutdownFence;
   private readonly scheduler = new GuardedScheduler();
@@ -330,8 +331,8 @@ export class OverlayController {
     if (this.isInactive()) {
       return;
     }
-    this.dismiss();
-    if (this.isInactive()) {
+    if (this.dashboardOpening) {
+      await this.dashboardOpening;
       return;
     }
     if (this.dashboard && !this.dashboard.isDestroyed()) {
@@ -351,28 +352,42 @@ export class OverlayController {
         this.dashboard = null;
       }
     });
-    let loadState: 'loaded' | 'cancelled';
+    const opening = (async (): Promise<void> => {
+      let loadState: 'loaded' | 'cancelled';
+      try {
+        loadState = await loadRenderer(
+          win,
+          'dashboard',
+          this.rendererDevServerUrl,
+          () => this.isInactive(),
+        );
+      } catch (error) {
+        if (this.dashboard === win) {
+          this.dashboard = null;
+        }
+        if (!win.isDestroyed()) {
+          win.destroy();
+        }
+        throw error;
+      }
+      if (loadState === 'cancelled' || this.isInactive() || win.isDestroyed()) {
+        return;
+      }
+      this.dismiss();
+      if (this.isInactive() || win.isDestroyed()) {
+        return;
+      }
+      win.show();
+      win.focus();
+    })();
+    this.dashboardOpening = opening;
     try {
-      loadState = await loadRenderer(
-        win,
-        'dashboard',
-        this.rendererDevServerUrl,
-        () => this.isInactive(),
-      );
-    } catch (error) {
-      if (this.dashboard === win) {
-        this.dashboard = null;
+      await opening;
+    } finally {
+      if (this.dashboardOpening === opening) {
+        this.dashboardOpening = null;
       }
-      if (!win.isDestroyed()) {
-        win.destroy();
-      }
-      throw error;
     }
-    if (loadState === 'cancelled' || this.isInactive() || win.isDestroyed()) {
-      return;
-    }
-    win.show();
-    win.focus();
   }
 
   closeDashboard(): void {

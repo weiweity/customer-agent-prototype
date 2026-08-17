@@ -1,8 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import {
-  createHash,
-} from 'node:crypto';
-import {
   existsSync,
   mkdirSync,
   readFileSync,
@@ -379,49 +376,6 @@ export function composeAppIconMaster(foxPixels, foxWidth, foxHeight) {
   return canvas;
 }
 
-export function analyzeAppIconRgba(pixels, width = APP_ICON_MASTER_SIZE, height = APP_ICON_MASTER_SIZE) {
-  const corners = [
-    [0, 0],
-    [width - 1, 0],
-    [0, height - 1],
-    [width - 1, height - 1],
-  ].map(([x, y]) => pixels[(y * width + x) * 4 + 3]);
-  const plateSampleY = [Math.round(height * 0.28), Math.round(height * 0.72)];
-  const plateSamples = plateSampleY.map((y) => {
-    const index = (y * width + Math.round(width / 2)) * 4;
-    return { r: pixels[index], g: pixels[index + 1], b: pixels[index + 2], a: pixels[index + 3] };
-  });
-  let foxMinX = width;
-  let foxMinY = height;
-  let foxMaxX = -1;
-  let foxMaxY = -1;
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4;
-      const red = pixels[index];
-      const green = pixels[index + 1];
-      const blue = pixels[index + 2];
-      const alpha = pixels[index + 3];
-      const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
-      if (alpha <= 80 || chroma <= 35) continue;
-      foxMinX = Math.min(foxMinX, x);
-      foxMinY = Math.min(foxMinY, y);
-      foxMaxX = Math.max(foxMaxX, x);
-      foxMaxY = Math.max(foxMaxY, y);
-    }
-  }
-  const foxExtent = foxMaxX >= foxMinX && foxMaxY >= foxMinY
-    ? Math.max(foxMaxX - foxMinX + 1, foxMaxY - foxMinY + 1)
-    : 0;
-  return {
-    width,
-    height,
-    corners,
-    plateSamples,
-    foxFill: foxExtent / APP_ICON_PLATE_SIZE,
-  };
-}
-
 export function generateAppIconMaster(options = {}) {
   const projectRoot = options.root ?? root;
   const sourceIcon = options.source ?? join(projectRoot, 'fox-head.png');
@@ -535,10 +489,6 @@ export function generateAppIcons(options = {}) {
     });
   }
   return masterPath;
-}
-
-export function fileSha256(path) {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
 const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === resolvePath(process.argv[1]);
