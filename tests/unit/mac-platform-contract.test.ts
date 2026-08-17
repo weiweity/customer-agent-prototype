@@ -51,6 +51,10 @@ const packageRunner = readFileSync(
   path.join(root, 'scripts/package-macos.mjs'),
   'utf8',
 );
+const nodeSystemCa = readFileSync(
+  path.join(root, 'scripts/node-system-ca.mjs'),
+  'utf8',
+);
 
 describe('macOS distribution contract', () => {
   it('executes the packaged brand icon gate against real fixture files', async () => {
@@ -134,10 +138,15 @@ describe('macOS distribution contract', () => {
   });
 
   it('bridges the macOS system trust store without disabling TLS verification', () => {
-    expect(packageRunner).toContain('SystemRootCertificates.keychain');
-    expect(packageRunner).toContain('NODE_EXTRA_CA_CERTS');
-    expect(packageRunner).toContain('rmSync(temporaryCaDirectory');
+    expect(packageRunner).toContain("prepareNodeSystemCaEnvironment()");
+    expect(packageRunner).toContain('systemCa.cleanup()');
+    expect(nodeSystemCa).toContain('SystemRootCertificates.keychain');
+    expect(nodeSystemCa).toContain('NODE_EXTRA_CA_CERTS');
+    expect(nodeSystemCa).toContain('removeTemporaryDirectory(temporaryDirectory)');
+    expect(nodeSystemCa).toContain('catch (error)');
+    expect(nodeSystemCa).toContain("customer-agent-system-ca-");
     expect(packageRunner).not.toContain('NODE_TLS_REJECT_UNAUTHORIZED');
+    expect(nodeSystemCa).not.toContain('NODE_TLS_REJECT_UNAUTHORIZED');
   });
 
   it('keeps hardened-runtime entitlements minimal and production-safe', () => {

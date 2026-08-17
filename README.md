@@ -132,7 +132,7 @@ pnpm test:e2e
 
 ## Windows 打包现状
 
-`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`，并关闭 `CSC_IDENTITY_AUTO_DISCOVERY`；图标生成本身可在 Windows 或 macOS 执行。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。
+`pnpm package:win` 会用纯 Node 确定性生成多尺寸 ICO，再构建未签名证明包：Windows 产物单独写入 `release/local-unsigned/windows/`，文件名强制带 `UNSIGNED`，关闭 `CSC_IDENTITY_AUTO_DISCOVERY` 与 NSIS differential package，并在 builder 完成后运行 fail-closed 后验。后验要求存在 `UNSIGNED.exe`、`win-unpacked/resources/icon.ico` 与 `build/icon.ico` 字节一致、Electron / Chromium / 项目第三方许可非空，同时拒绝 `.blockmap`、`latest*.yml` 与 `app-update.yml`。该检查只证明离线包的文件结构和资源副本，不验证 PE 可执行文件内部的图标资源，也不验证 Authenticode 状态；对应的真实 Windows 安装、任务栏图标和系统签名仍需 Windows 设备验收。它**不是**正式外发包，也没有 Authenticode / EV 签名；仓库不提供 Windows `distribution` 路径，禁止把未签名产物写成已签名。未来若要正式分发，必须另走独立的 `release/distribution/` 与公司证书门禁，不能复用本机 UNSIGNED 产物。
 
 ## macOS 打包与发布
 

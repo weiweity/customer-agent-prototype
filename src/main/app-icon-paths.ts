@@ -9,10 +9,7 @@ export function packagedAppIconCandidates(
   platform: NodeJS.Platform = process.platform,
 ): readonly string[] {
   if (platform === 'darwin') {
-    return [
-      join(location.resourcesPath, 'icon.icns'),
-      join(location.resourcesPath, 'electron.icns'),
-    ];
+    return [join(location.resourcesPath, 'icon.icns')];
   }
   if (platform === 'win32') {
     return [

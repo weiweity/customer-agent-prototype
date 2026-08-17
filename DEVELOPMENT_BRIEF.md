@@ -144,7 +144,7 @@ tests/
 
 - Node.js 24.x；`packageManager` 锁定 pnpm 11.19.0。
 - 必须提供：`pnpm dev`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm test:e2e`。日常狐狸动效回归使用轻量 `pnpm test:float`；昂贵的品牌 raster / Dock 图标确定性生成独立为 `pnpm test:assets`，不得塞回每次动效 fast loop。狐狸品牌 raster canonical 用 `pnpm generate:fox-head` 从 `assets/fox-head-master.png` 派生 `fox-head.png`、Dashboard 深色耳麦和 Dock 图标。
-- 保留 `pnpm package:win`，本轮不要求产出 Windows 安装包。
+- 保留 `pnpm package:win`，Windows 未签名本机证明包隔离写入 `release/local-unsigned/windows/`，NSIS 关闭 differential package；builder 完成后必须 fail-closed 校验 `UNSIGNED.exe`、无 blockmap / latest / app-update 元数据、`win-unpacked/resources/icon.ico` 与 `build/icon.ico` 字节一致且必要许可证非空。不把该后验写成 PE 图标资源、Authenticode 或真实 Windows 安装验收。本轮主流程最终决定是否实际跨平台产包，日常定向测试不要求产出 Windows 安装包。
 - 提供 `pnpm package:mac:local` 生成显式未签名、不可外发的 Universal DMG + ZIP，用于本机证明；提供 `pnpm package:mac` 作为正式门禁，缺长期 Bundle ID、完整 Xcode、Developer ID 或公证凭证时必须 fail-closed。
 - Mac / Windows 应用图标从仓内透明狐狸确定性合成独立 `assets/app-icon.png` master（近白 squircle 底板），再生成 `build/icon.icns` / `build/icon.ico`；Tray 与浮窗仍用透明 `fox-head.png`。正式包启用 Hardened Runtime、最小权限 entitlement、签名与 Apple notarization。证书和公证凭证永不进入 Git。
 
