@@ -94,20 +94,41 @@ FOX_IDLE -> SEARCH_INPUT -> RESULTS | EMPTY | ERROR -> COPIED -> FOX_IDLE
 
 ```text
 src/
-  main/          窗口、快捷键、锚定、生命周期、白名单 IPC、Dashboard 单例
+  main/          窗口、快捷键、锚定、生命周期、白名单 IPC、Dashboard 单例、
+                 drag settle、layout ACK、handoff、shutdown fence、app identity
   preload/       最小类型化 API（仅 overlay）
   shared/        合同、状态机、几何、狐狸动效参数、Dashboard 访问控制
   renderer/      FoxApp + QueryApp + DashboardApp + 合成 fixture / manifest
+docs/            Tutorial / How-to / Reference / Explanation（四象限）
 tests/
-  unit/          状态机、锚定、动效参数、manifest、Dashboard 授权
+  unit/          状态机、锚定、动效参数、manifest、Dashboard 授权、drag settle
   component/     展开、空查询、IME、Top 3、复制、导航、Fox 吸附 class
   e2e/           Electron smoke + Dashboard 单例 / 安全窗
+scripts/         图标派生、本机证明包、正式门禁与打包后验
 ```
 
 ## 4. 数据流与信任边界
 
 ```text
-[Fox click / globalShortcut]
+[Fox pointer / generation++]
+      |
+      +-- moveFoxBy(dx,dy,finished,generation) --> [Main dock session]
+      |         finished + matching generation
+      |              v
+      |     setBounds once + settleId++ + fox-drag-settled
+      |              v
+      |     Fox paints same frame --> commitFoxDragSettle(settleId)
+      |              v
+      |     watchdog 1.6s / stale ACK ignored
+      |
+[Fox click / globalShortcut] -- if drag still settling, defer OPEN
+      |
+      v
+[two-phase handoff]
+      prepare-search (hidden Query, actual 88px center, 64px, matrix)
+        --> open-armed --> show Query / hide Fox / focus
+        --> activate-search --> open-finished
+      close: collapse --> close-finished --> showInactive Fox
       |
       v
 [Query capsule input]
@@ -118,34 +139,43 @@ tests/
       +--> [Top 3 original answers, effective only]
       |
       +-- copy request --> [typed preload API] --> [Main clipboard]
+      |
+      +-- DOM hug measure --> report-query-layout / resize-query-height
+               trusted Query main-frame + session/sequence/phase gate
+               clamp 240..min(620, availableHeight) --> one setBounds --> ACK
+               stale/mismatch --> 240/340/430/620 fallback only
 
-[Query Dashboard icon]
+[Query Dashboard icon] -- dashboard:open, trusted + role=query
+      |
+[native menu / Tray / Dock] -- Main openDashboard + native failure notifier
       |
       v
-[dashboard:open IPC] -- trusted + role=query --+
-                                               |
-[native context menu / Tray / app menu / Dock]-+--> [Main openDashboard]
-                                                        |
-                                                        v
-                                         [lazy BrowserWindow, no preload]
-                                                        |
-                                                        v
-                                         [static frozen manifest only]
+[single-flight openDashboard]
+      existing window? reveal : lazy create (show:false, no preload)
+      loadRenderer --> reveal (restore/show/focus)
+      reveal ok --> dismiss Query --> {ok:true}
+      any fail --> destroy new window, keep Query --> {ok:false}
 
+[app ready] applyApplicationIdentity (regular Dock, assets/app-icon.png)
+[before-quit / will-quit] shutdown fence.begin --> guarded scheduler dispose
+[package:*] generate icons --> build --> electron-builder --> post-verifier
 ```
 
 - Dashboard renderer 不得直接访问 Node/Electron API，也不得获得 `customerAgent`。
+- Fox / Query 才进入 `trustedContents()`；Dashboard 不在 overlay 信任集里。
 - fixture 与 manifest 静态打包，不发网络请求。
 - 禁止 `localStorage`、IndexedDB、文件落盘或分析 SDK。
 - 不读取 `.env`、钥匙串或凭证。
 - CSP 至少限制 `default-src 'self'`。
+- 关机后 overlay 视为 inactive；`GuardedScheduler` 丢弃未触发的定时器。
+- 本地证明包的后验只证明文件树 / Universal / 许可 / 品牌副本，不构成外发授权。
 
 ## 5. 工具链与脚本
 
 - Node.js 24.x；`packageManager` 锁定 pnpm 11.19.0。
-- 必须提供：`pnpm dev`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm test:e2e`。日常狐狸动效回归使用轻量 `pnpm test:float`；昂贵的品牌 raster / Dock 图标确定性生成独立为 `pnpm test:assets`，不得塞回每次动效 fast loop。狐狸品牌 raster canonical 用 `pnpm generate:fox-head` 从 `assets/fox-head-master.png` 派生 `fox-head.png`、Dashboard 深色耳麦和 Dock 图标。
-- 保留 `pnpm package:win`，Windows 未签名本机证明包隔离写入 `release/local-unsigned/windows/`，NSIS 关闭 differential package；builder 完成后必须 fail-closed 校验 `UNSIGNED.exe`、无 blockmap / latest / app-update 元数据、`win-unpacked/resources/icon.ico` 与 `build/icon.ico` 字节一致且必要许可证非空。不把该后验写成 PE 图标资源、Authenticode 或真实 Windows 安装验收。本轮主流程最终决定是否实际跨平台产包，日常定向测试不要求产出 Windows 安装包。
-- 提供 `pnpm package:mac:local` 生成显式未签名、不可外发的 Universal DMG + ZIP，用于本机证明；提供 `pnpm package:mac` 作为正式门禁，缺长期 Bundle ID、完整 Xcode、Developer ID 或公证凭证时必须 fail-closed。
+- 必须提供：`pnpm dev`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm test:e2e`。日常狐狸动效回归使用轻量 `pnpm test:float`（**不含**完整 drag-settle）；`pnpm test:assets` 只验证现有品牌 raster / Dock 合同，不等于生成，不得塞回每次动效 fast loop；`pnpm test:e2e:float` 自身先 build 再跑 `@float`。狐狸品牌 raster canonical 用 `pnpm generate:fox-head` 从 `assets/fox-head-master.png` 派生 `fox-head.png`、Dashboard 深色耳麦；默认同时派生 `assets/app-icon.png` 与 build PNG/ICO，macOS 上再派生 ICNS。
+- 保留 `pnpm package:win`，Windows 未签名本机证明包隔离写入 `release/local-unsigned/windows/`，NSIS 关闭 differential package；builder 完成后必须 fail-closed 跑 `scripts/verify-windows-package.mjs`：校验 `UNSIGNED.exe`、无 blockmap / latest / app-update 元数据、`win-unpacked/resources/icon.ico` 与 `build/icon.ico` 字节一致且必要许可证非空。不把该后验写成 PE 图标资源、Authenticode 或真实 Windows 安装验收。本轮主流程最终决定是否实际跨平台产包，日常定向测试不要求产出 Windows 安装包。
+- 提供 `pnpm package:mac:local` 生成显式未签名、不可外发的 Universal DMG + ZIP，用于本机证明，并跑 `finalize-mac-package` + `verify-mac-package`；提供 `pnpm package:mac` 作为正式门禁，缺长期 Bundle ID、完整 Xcode、Developer ID 或公证凭证时必须 fail-closed。当前 `appId=local.demo.customer-agent` 不满足正式外发前置，不能暗示已经可以正式发包。
 - Mac / Windows 应用图标从仓内透明狐狸确定性合成独立 `assets/app-icon.png` master（近白 squircle 底板），再生成 `build/icon.icns` / `build/icon.ico`；Tray 与浮窗仍用透明 `fox-head.png`。正式包启用 Hardened Runtime、最小权限 entitlement、签名与 Apple notarization。证书和公证凭证永不进入 Git。
 
 ## 6. 最低测试矩阵
@@ -174,8 +204,8 @@ tests/
 - lint、typecheck、unit/component test、build 全部实际通过。
 - Electron smoke 尽量实际通过；若环境限制，不能把「测试文件存在」写成 PASS。
 - 无真实数据、凭证、飞书链接、远端 API、数据库或模型调用。
-- README 写清启动命令、快捷键、双表面边界、数据边界、透明效果平台差异、快捷键冲突降级。
-- 不 commit、不 push。
+- README 写清启动命令、快捷键、双表面边界、数据边界、透明效果平台差异、快捷键冲突降级，并一跳到达四象限文档。
+- 任务包本身不授权 Git；commit、push、merge、deploy 分别授权。
 
 ## 8. 明确不做
 
