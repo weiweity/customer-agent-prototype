@@ -151,7 +151,7 @@ pnpm test:e2e
 | `pnpm test` | 全量 unit / component，含 drag-settle 与 Dashboard 授权 | 不是真实窗口 |
 | `pnpm test:e2e` | 先 build，再跑全部 Playwright | 不是正式发包，也不是真实 OS 焦点 |
 
-`pnpm test:e2e` 会先 build，再启动 Electron：验证左右半露与探头、反复双窗交接、共享狐狸首帧中心 / 尺寸 / 姿态矩阵、关闭后无需点击页面即可直接键入、点击查询狐狸收起、内容贴合高度、数字键复制、自动收起、程序坞事件打开 Dashboard、Dashboard 单例 / 安全窗 / 原生滚动 / 折叠导航 / VOC 时间切片 / 本地推送 / 图表联动 / 响应式布局，并核对系统剪贴板。截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。自动化的 renderer 点击与 `activate` 事件不能等同真实 macOS 应用激活；从 Finder / 其他应用实测程序坞、BrowserWindow / WebContents 物理键盘投递，以及真实 OS 全局快捷键仍需人工确认。
+`pnpm test:e2e` 会先 build，再启动 Electron：验证左右停靠与 drag-settle、台前调度边界采纳、反复双窗交接、共享狐狸首帧中心 / 尺寸 / 姿态矩阵、关闭后无需点击页面即可直接键入、点击查询狐狸收起、内容贴合高度、数字键复制、自动收起，以及 Dashboard 的可信入口、单例、安全隔离与程序坞恢复，并核对系统剪贴板。探头 / 缩回、查询纵向拖拽、Dashboard 导航 / 模块 / 主题 / 筛选的状态机由更稳定的 unit/component 测试覆盖；默认 Playwright 门禁不再执行依赖 CDP 鼠标命中的长交互链。截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。自动化的 renderer 点击与 `activate` 事件不能等同真实 macOS 应用激活；从 Finder / 其他应用实测程序坞、BrowserWindow / WebContents 物理键盘投递、侧栏与 Query 纵向拖拽、贴边 hover / retract，以及真实 OS 全局快捷键仍需人工确认。
 
 当前 macOS 开发机可自动验证单屏左右贴边、窗口内动效和 Dashboard 浏览；跨实体多显示器拖拽、Windows 合成器观感及真实 OS 全局快捷键投递仍需对应设备手工验收。命令对照与打包门禁见 [如何验证桌面 Demo](docs/how-to-verify-desktop.md)。
 
