@@ -104,6 +104,8 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 `isTestHarnessEnabled()` 仅在 `DEMO_E2E=1` 或命令行包含 `--demo-e2e` 时返回 true。`attachTestHarness(controller)` 在启用时把非枚举的 `globalThis.__demoTest` 绑定到 Electron 主进程，用于 E2E 的展开、收起、窗口快照、布局回执和阶段报告。
 
+`beginFoxSetBoundsTrace()` 会清空并开始记录应用对 E2E Fox 窗口发起的 `setBounds` 调用；`endFoxSetBoundsTrace()` 停止记录并返回 bounds / animate 快照。这两个方法只包装测试进程中已存在的 Fox `BrowserWindow`，用来区分应用主动移窗与 WindowServer 重新安置；它们不记录 OS 内部调用，也不改变生产 bounds 策略。
+
 这不是生产 API：生产启动不注入 harness，renderer 不应依赖 `__demoTest`，也不得用 harness 证明真实 macOS WindowServer、Dock、Stage Manager 或 Windows 合成器行为。相关自动化边界见 [如何验证桌面 Demo](how-to-verify-desktop.md)。
 
 ## 8. 对应测试与验证

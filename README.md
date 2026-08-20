@@ -19,6 +19,9 @@
 | 查阅本轮抽出的 Query / overlay / Dashboard 叶子模块合同 | [docs/reference-extracted-module-contracts.md](docs/reference-extracted-module-contracts.md) |
 | 核对 Demo 与正式九端口 / Postgres 为何不能直插、adapter 要补什么 | [docs/reference-api-adapter-handoff.md](docs/reference-api-adapter-handoff.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |
+| 查看版本变化与本次验证摘要 | [CHANGELOG.md](CHANGELOG.md) |
+| 查看已明确延后的验证债务 | [TODOS.md](TODOS.md) |
+| 查阅打包携带的第三方软件许可声明 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 
 项目本体并不大。用 `pnpm workspace:size` 可把源码与依赖、打包产物、工具索引分开统计；`pnpm clean:preview` 默认只预览可再生成项，确认清单后才运行 `pnpm clean:generated`。`pnpm clean:deep` 还会删除 `node_modules`，仅用于归档或需要从 `pnpm install --frozen-lockfile` 重建依赖时。清理脚本不会触碰 `.git`、`.codegraph`、`src`、`assets`、`evidence`、`docs`、`tests` 或用户提供的 ZIP。完整边界见 [空间占用与清理](docs/how-to-verify-desktop.md#5-空间占用与清理)。
 
