@@ -426,6 +426,31 @@ describe('workspace hygiene', () => {
     expect(() => resolveCleanupTarget(root, 'out')).toThrow(/symlink cleanup target/);
   });
 
+  it('rejects symlinked cleanup ancestors before deleting protected content', () => {
+    for (const relativeAncestor of ['apps', 'apps/desktop']) {
+      const root = createWorkspaceFixture();
+      const protectedOutput = path.join(root, 'evidence/desktop/out');
+      const sentinel = path.join(protectedOutput, 'must-survive.txt');
+      mkdirSync(protectedOutput, { recursive: true });
+      writeFileSync(sentinel, 'protected');
+
+      const symlinkTarget = relativeAncestor === 'apps'
+        ? path.join(root, 'evidence')
+        : path.join(root, 'evidence/desktop');
+      const symlinkPath = path.join(root, relativeAncestor);
+      rmSync(symlinkPath, { recursive: true, force: true });
+      symlinkSync(symlinkTarget, symlinkPath);
+
+      expect(() => cleanWorkspace({
+        projectRoot: root,
+        scope: 'generated',
+        apply: true,
+      })).toThrow(/symlink cleanup target/);
+      expect(existsSync(sentinel)).toBe(true);
+      expect(existsSync(path.join(root, 'release/local-unsigned/package.bin'))).toBe(true);
+    }
+  });
+
   it('rejects a workspace whose root package manifest is a symlink', () => {
     const root = createWorkspaceFixture();
     const externalManifestRoot = mkdtempSync(

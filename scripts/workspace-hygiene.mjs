@@ -436,11 +436,25 @@ export function resolveCleanupTarget(projectRoot, relativeTarget) {
   if (!resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
     throw new Error(`Refusing cleanup target outside workspace: ${resolvedTarget}`);
   }
-  if (existsSync(resolvedTarget)) {
-    const targetStats = lstatSync(resolvedTarget);
-    if (targetStats.isSymbolicLink()) {
-      throw new Error(`Refusing symlink cleanup target: ${resolvedTarget}`);
+
+  let currentPath = resolvedRoot;
+  const pathSegments = relativeTarget.split('/');
+  for (const [index, segment] of pathSegments.entries()) {
+    currentPath = path.join(currentPath, segment);
+    const stats = lstatSync(currentPath, { throwIfNoEntry: false });
+    if (!stats) {
+      break;
     }
+    if (stats.isSymbolicLink()) {
+      throw new Error(`Refusing symlink cleanup target component: ${currentPath}`);
+    }
+    const isFinalSegment = index === pathSegments.length - 1;
+    if (!isFinalSegment && !stats.isDirectory()) {
+      throw new Error(`Refusing non-directory cleanup target component: ${currentPath}`);
+    }
+  }
+
+  if (existsSync(resolvedTarget)) {
     const realTarget = realpathSync(resolvedTarget);
     if (!realTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
       throw new Error(`Refusing cleanup target outside workspace: ${realTarget}`);
@@ -529,7 +543,8 @@ export function cleanWorkspace({
   if (apply) {
     for (const target of plan) {
       if (target.existed) {
-        remove(target.absolutePath, { recursive: true, force: true });
+        const verifiedPath = resolveCleanupTarget(resolvedRoot, target.relativeTarget);
+        remove(verifiedPath, { recursive: true, force: true });
       }
     }
   }
