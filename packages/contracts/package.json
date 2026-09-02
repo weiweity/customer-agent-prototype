@@ -1,0 +1,28 @@
+{
+  "name": "@customer-agent/contracts",
+  "private": true,
+  "type": "module",
+  "description": "客服 Agent 已锁定 OpenAPI 的确定性类型生成与运行时边界校验",
+  "exports": {
+    ".": "./src/index.ts",
+    "./generated": "./src/generated/openapi.generated.ts"
+  },
+  "scripts": {
+    "generate": "node scripts/generate-contracts.mjs",
+    "check:generated": "node scripts/generate-contracts.mjs --check",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "pnpm check:generated && tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.2",
+    "vitest": "3.2.7",
+    "yaml": "2.9.0"
+  }
+}
