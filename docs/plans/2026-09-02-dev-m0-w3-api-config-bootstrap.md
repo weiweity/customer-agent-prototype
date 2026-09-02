@@ -1,13 +1,14 @@
 # DEV-M0-W3 Application API / config bootstrap 执行记录
 
 > **文档状态：** `EXECUTION RECORD`
-> **切片状态：** `COMMIT AUTHORIZED · VALIDATED · NOT PUSHED`
+> **切片状态：** `RELEASE CANDIDATE · VALIDATED`
 > **开工输入：** 用户于 2026-09-02 在 W2 Review、合并、分支清理与“进入下一开发切片”的有序步骤后明确表示“都授权了”
 > **提交输入：** 用户于 2026-09-02 明确给出“产品仓 DEV-M0-W3 提交授权（当前头 1a77297）”
+> **后续 Git 授权输入：** 用户于 2026-09-02 明确表示 W3 后续步骤均授权，按“推送 → PR → Review/必要修复 → 合并 → 候选分支删除”有序执行
 > **基线：** `origin/main` / `1a77297d51ce3cf3a0a551290675c60c941be4b6`
 > **分支：** `codex/dev-m0-api-config-bootstrap`
 > **隔离工作树：** 仓库同级的 `customer-agent-api-config-bootstrap`
-> **Git 边界：** W3 本地实现、验证与本次提交已分别授权；不据此推送、创建 PR、合并或部署
+> **Git 边界：** W3 本地实现、验证、提交及后续候选包 Git 流程已获当前明确授权；不包含部署、真实数据接入或下一开发切片
 
 ## 1. 目标与不变量
 
@@ -46,7 +47,7 @@ W3 只建立正式服务最小可运行骨架：一个拥有启动生命周期�
 | `pnpm test:api` | PASS；最终定向复核为 2 files / 13 tests + 1 compiled-package Node smoke；无弃用警告 |
 | `pnpm lint` | PASS |
 | `pnpm typecheck` | PASS；contracts、API、desktop 三包 |
-| `pnpm test` | PASS；全量运行时 contracts 16、API 11、desktop 508，共 535 个 Vitest tests，另有 2 个 compiled-package Node smoke；最终 Review 新增 2 个 API 失败/关闭边界测试并由 13-test API 套件定向复核，workspace cleanup 的 23-test 文件也单独通过，未重复运行未受影响的其余桌面套件 |
+| `pnpm test` | PASS；推送前以 Node.js 24 全量复核 contracts 16、API 13、desktop 508，共 537 个 Vitest tests，另有 2 个 compiled-package Node smoke |
 | `pnpm build` | PASS；contracts 生成物匹配，API TypeScript 与 desktop Electron/Vite 均构建成功 |
 | `pnpm workspace:check` | PASS；root policy PASS，source budget remainder 7.00 MiB / 32.0 MiB |
 | `pnpm contracts:verify` | PASS；`VERIFIED_NOT_ACTIVATED`，`ddev_authorized=false`、`runtime_activated=false` |
@@ -63,4 +64,4 @@ W3 只建立正式服务最小可运行骨架：一个拥有启动生命周期�
 
 ## 5. 后续切片
 
-W3 本地实现与验证已经完成，本次提交已获单独授权；提交完成后的下一道 Git 门是 W3 推送。W3 落地后，DEV-M0 下一片应建立不可变 migration/DB 深模块：锁定 DDL 来源、提供 `status → plan → apply → verify`、PG15 clean install、ACL/SQLSTATE、N-only/N-1 兼容与失败回滚证据。该后续范围不由本记录自动开工。
+W3 本地实现与验证已经完成，候选包按已授权顺序执行推送、PR、Review、合并与候选分支清理；动态 Git 结果以远端 PR 和提交记录为准，不回写本执行快照。W3 落地后，DEV-M0 下一片应建立不可变 migration/DB 深模块：锁定 DDL 来源、提供 `status → plan → apply → verify`、PG15 clean install、ACL/SQLSTATE、N-only/N-1 兼容与失败回滚证据。该后续范围不由本记录自动开工。
