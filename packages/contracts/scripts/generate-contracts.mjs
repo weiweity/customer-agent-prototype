@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
 import { parse, stringify } from 'yaml';
-import { verifyIngestedContractSet } from '../../../scripts/customer-agent-contract-set.mjs';
+import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const CODEGEN_SCHEMA = 'customer-agent-contract-codegen/v1';
 const RUNTIME_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
@@ -39,6 +39,7 @@ const NON_VALIDATION_SCHEMA_KEYS = new Set([
   'writeOnly',
   'xml',
 ]);
+const VALIDATION_EXTENSION_SCHEMA_KEYS = new Set(['x-unique-by']);
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -46,19 +47,6 @@ function isRecord(value) {
 
 function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
-}
-
-function readJson(filePath, label) {
-  let value;
-  try {
-    value = JSON.parse(readFileSync(filePath, 'utf8'));
-  } catch (error) {
-    throw new Error(`${label} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  if (!isRecord(value)) {
-    throw new Error(`${label} must be an object`);
-  }
-  return value;
 }
 
 function requireRecord(value, label) {
@@ -100,7 +88,7 @@ function rewriteComponentReference(reference) {
   return `#/$defs/${reference.slice(prefix.length)}`;
 }
 
-function toRuntimeSchema(value) {
+export function toRuntimeSchema(value) {
   if (Array.isArray(value)) {
     return value.map(toRuntimeSchema);
   }
@@ -108,14 +96,21 @@ function toRuntimeSchema(value) {
     return value;
   }
 
-  const transformed = {};
+  const transformed = Object.create(null);
   for (const [key, child] of Object.entries(value)) {
-    if (key.startsWith('x-') || NON_VALIDATION_SCHEMA_KEYS.has(key)) {
+    if (
+      (key.startsWith('x-') && !VALIDATION_EXTENSION_SCHEMA_KEYS.has(key))
+      || NON_VALIDATION_SCHEMA_KEYS.has(key)
+    ) {
       continue;
     }
-    transformed[key] = key === '$ref'
-      ? rewriteComponentReference(requireString(child, '$ref'))
-      : toRuntimeSchema(child);
+    if (key === '$ref') {
+      transformed[key] = rewriteComponentReference(requireString(child, '$ref'));
+    } else if (VALIDATION_EXTENSION_SCHEMA_KEYS.has(key)) {
+      transformed[key] = requireString(child, key);
+    } else {
+      transformed[key] = toRuntimeSchema(child);
+    }
   }
 
   if (
@@ -174,15 +169,10 @@ function artifactDescriptor(relativePath, content) {
   });
 }
 
-export async function buildGeneratedArtifacts({ projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
-  const resolvedRoot = path.resolve(projectRoot);
-  const verified = verifyIngestedContractSet({ projectRoot: resolvedRoot });
-  const lock = readJson(verified.lock_path, 'Contract-set lock');
-  const manifest = readJson(path.join(verified.path, 'contract-set.json'), 'Contract-set manifest');
+async function buildGeneratedArtifactsFromSnapshot(snapshot) {
+  const { lock, manifest, openapi_source: source } = snapshot;
   const openapiDescriptor = requireRecord(manifest.openapi, 'OpenAPI descriptor');
   const databaseDescriptor = requireRecord(manifest.database, 'Database descriptor');
-  const openapiPath = path.join(verified.path, requireString(openapiDescriptor.file, 'OpenAPI file'));
-  const source = readFileSync(openapiPath, 'utf8');
   const openapiDocument = parse(source, { maxAliasCount: 0 });
   const root = requireRecord(openapiDocument, 'OpenAPI document');
   const info = requireRecord(root.info, 'OpenAPI info');
@@ -231,15 +221,15 @@ export async function buildGeneratedArtifacts({ projectRoot = DEFAULT_PROJECT_RO
   };
   const provenanceValue = {
     schema: CODEGEN_SCHEMA,
-    contract_set_id: verified.contract_set_id,
+    contract_set_id: snapshot.contract_set_id,
     source_repository: lock.source_repository,
-    source_git_sha: verified.source_git_sha,
+    source_git_sha: snapshot.source_git_sha,
     manifest_sha256: lock.manifest_sha256,
     openapi_version: contractVersion,
     openapi_sha256: lock.openapi_sha256,
     database_version: databaseDescriptor.version,
     database_sha256: lock.database_sha256,
-    intake_status: verified.intake_status,
+    intake_status: snapshot.intake_status,
     runtime_activated: false,
     runtime_schema_dialect: RUNTIME_SCHEMA_DIALECT,
     component_schema_count: schemaNames.length,
@@ -262,7 +252,7 @@ export async function buildGeneratedArtifacts({ projectRoot = DEFAULT_PROJECT_RO
   }, null, 2)}\n`;
 
   return Object.freeze({
-    contract_set_id: verified.contract_set_id,
+    contract_set_id: snapshot.contract_set_id,
     runtime_activated: false,
     schema_count: schemaNames.length,
     files: new Map([
@@ -273,6 +263,14 @@ export async function buildGeneratedArtifacts({ projectRoot = DEFAULT_PROJECT_RO
       [OUTPUTS.manifest, codegenManifest],
     ]),
   });
+}
+
+export async function buildGeneratedArtifacts({ projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+  const resolvedRoot = path.resolve(projectRoot);
+  return withVerifiedContractSetSnapshot(
+    { projectRoot: resolvedRoot },
+    buildGeneratedArtifactsFromSnapshot,
+  );
 }
 
 function assertSafeOutputPath(projectRoot, relativePath) {
@@ -328,32 +326,34 @@ function assertExactGeneratedMemberSet(projectRoot, expectedPaths) {
 
 export async function generateContracts({ projectRoot = DEFAULT_PROJECT_ROOT, check = false } = {}) {
   const resolvedRoot = path.resolve(projectRoot);
-  const generated = await buildGeneratedArtifacts({ projectRoot: resolvedRoot });
-  const drift = [];
+  return withVerifiedContractSetSnapshot({ projectRoot: resolvedRoot }, async (snapshot) => {
+    const generated = await buildGeneratedArtifactsFromSnapshot(snapshot);
+    const drift = [];
 
-  for (const [relativePath, expectedContent] of generated.files) {
-    const absolutePath = assertSafeOutputPath(resolvedRoot, relativePath);
-    if (check) {
-      if (!existsSync(absolutePath) || readFileSync(absolutePath, 'utf8') !== expectedContent) {
-        drift.push(relativePath);
+    for (const [relativePath, expectedContent] of generated.files) {
+      const absolutePath = assertSafeOutputPath(resolvedRoot, relativePath);
+      if (check) {
+        if (!existsSync(absolutePath) || readFileSync(absolutePath, 'utf8') !== expectedContent) {
+          drift.push(relativePath);
+        }
+        continue;
       }
-      continue;
+      if (!existsSync(absolutePath) || readFileSync(absolutePath, 'utf8') !== expectedContent) {
+        writeAtomically(absolutePath, expectedContent);
+      }
     }
-    if (!existsSync(absolutePath) || readFileSync(absolutePath, 'utf8') !== expectedContent) {
-      writeAtomically(absolutePath, expectedContent);
-    }
-  }
 
-  if (drift.length > 0) {
-    throw new Error(`Generated contract drift: ${drift.join(', ')}`);
-  }
-  assertExactGeneratedMemberSet(resolvedRoot, generated.files.keys());
-  return Object.freeze({
-    status: check ? 'GENERATED_MATCH' : 'GENERATED',
-    contract_set_id: generated.contract_set_id,
-    runtime_activated: false,
-    schema_count: generated.schema_count,
-    files: [...generated.files.keys()],
+    if (drift.length > 0) {
+      throw new Error(`Generated contract drift: ${drift.join(', ')}`);
+    }
+    assertExactGeneratedMemberSet(resolvedRoot, generated.files.keys());
+    return Object.freeze({
+      status: check ? 'GENERATED_MATCH' : 'GENERATED',
+      contract_set_id: generated.contract_set_id,
+      runtime_activated: false,
+      schema_count: generated.schema_count,
+      files: [...generated.files.keys()],
+    });
   });
 }
 

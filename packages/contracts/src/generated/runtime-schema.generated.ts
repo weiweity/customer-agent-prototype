@@ -1211,6 +1211,7 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "minItems": 1,
           "maxItems": 4,
           "uniqueItems": true,
+          "x-unique-by": "domain",
           "items": {
             "$ref": "#/$defs/AuthoritativeSourceBinding"
           }
@@ -1234,6 +1235,7 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "minItems": 1,
           "maxItems": 4,
           "uniqueItems": true,
+          "x-unique-by": "domain",
           "items": {
             "$ref": "#/$defs/AuthoritativeSourceBinding"
           }
@@ -1838,6 +1840,7 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "minItems": 1,
           "maxItems": 4,
           "uniqueItems": true,
+          "x-unique-by": "domain",
           "items": {
             "$ref": "#/$defs/AuthoritativeSourceBindingStatus"
           }

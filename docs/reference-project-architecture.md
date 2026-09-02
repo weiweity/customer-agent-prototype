@@ -54,7 +54,7 @@ contracts/upstream（不可变输入）
 | `apps/desktop/scripts/` | 图标生成、桌面打包与包后验 | 运行时业务逻辑、workspace 合同接收 |
 | 根 `scripts/` | 合同快照接收与 workspace 卫生门 | Electron 运行时、UI 或打包资产 |
 | `contracts/upstream/` | 来自项目记录仓、带来源 SHA 与双哈希的不可变机器合同快照及消费锁 | 手改合同、运行时跨仓读取、凭证、生成类型或 Ddev 状态真源 |
-| `packages/contracts/` | 校验消费锁后确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；拥有生成物指纹与脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
+| `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -62,7 +62,7 @@ contracts/upstream（不可变输入）
 
 `DEV-M0-W1` 只把现有桌面包原样移入 `apps/desktop`，并同步 package、路径、测试和打包配置；根 `pnpm` 命令继续作为唯一公开入口。该切片不得混入 IPC 改造、API、DB 或 UI 行为，迁移后的模块边界和依赖方向保持不变。
 
-`DEV-M0-W2` 把“合同接收”与“合同编译”分为两个写入所有者：根 intake 脚本只验证并保存不可变输入；`packages/contracts/scripts/generate-contracts.mjs` 只从当前 lock 生成产品资产。生成器拒绝外部 `$ref`、来源版本/双哈希漂移和手改生成物；运行时 validator 只返回 schema 路径与关键字，不回显请求正文。
+`DEV-M0-W2` 把“合同接收”与“合同编译”分为两个写入所有者：根 intake 脚本验证、保存不可变输入并拥有 rollover/read snapshot 互斥；`packages/contracts/scripts/generate-contracts.mjs` 只从锁内一致快照生成产品资产。生成器拒绝外部 `$ref`、来源版本/双哈希漂移和手改生成物，并保留已登记的 `x-unique-by` 验证扩展；运行时 validator 按 schema 延迟编译，只返回数量有上限的 schema 路径与关键字，不回显请求正文。
 
 ## 3. 三个窗口和安全边界
 

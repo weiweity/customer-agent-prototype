@@ -24,6 +24,47 @@ export type ContractValidationResult<Name extends ContractSchemaName> =
   | Readonly<{ ok: false; issues: readonly ContractValidationIssue[] }>;
 
 const addFormats = (formatsModule.default ?? formatsModule) as unknown as FormatsPlugin;
+const UNIQUE_BY_KEYWORD = 'x-unique-by';
+const MAX_VALIDATION_ISSUES = 16;
+
+type ValidationRuntime = Readonly<{
+  ajv: Ajv2020;
+  validators: Map<string, ValidateFunction>;
+}>;
+
+let validationRuntime: ValidationRuntime | undefined;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function scalarIdentity(value: unknown): string | undefined {
+  if (value === null) {
+    return 'null';
+  }
+  if (typeof value === 'string' || typeof value === 'boolean') {
+    return `${typeof value}:${String(value)}`;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `number:${String(value)}`;
+  }
+  return undefined;
+}
+
+function hasUniquePropertyValues(propertyName: string, items: unknown[]): boolean {
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (!isRecord(item) || !Object.hasOwn(item, propertyName)) {
+      continue;
+    }
+    const identity = scalarIdentity(item[propertyName]);
+    if (identity === undefined || seen.has(identity)) {
+      return false;
+    }
+    seen.add(identity);
+  }
+  return true;
+}
 
 function toIssue(error: ErrorObject): ContractValidationIssue {
   return Object.freeze({
@@ -38,9 +79,9 @@ function jsonPointerSegment(value: string): string {
   return value.replaceAll('~', '~0').replaceAll('/', '~1');
 }
 
-function buildValidators(): ReadonlyMap<string, ValidateFunction> {
+function buildValidationRuntime(): ValidationRuntime {
   const ajv = new Ajv2020({
-    allErrors: true,
+    allErrors: false,
     strict: true,
     strictTypes: false,
     validateFormats: true,
@@ -48,17 +89,34 @@ function buildValidators(): ReadonlyMap<string, ValidateFunction> {
   addFormats(ajv);
   ajv.addFormat('binary', { type: 'string', validate: () => true });
   ajv.addFormat('double', { type: 'number', validate: Number.isFinite });
+  ajv.addKeyword({
+    keyword: UNIQUE_BY_KEYWORD,
+    type: 'array',
+    schemaType: 'string',
+    errors: false,
+    validate: hasUniquePropertyValues,
+  });
   ajv.addSchema(OPENAPI_RUNTIME_SCHEMA_DOCUMENT);
-
-  return new Map(
-    COMPONENT_SCHEMA_NAMES.map((name) => [
-      name,
-      ajv.compile({ $ref: `${OPENAPI_RUNTIME_SCHEMA_ID}#/$defs/${jsonPointerSegment(name)}` }),
-    ]),
-  );
+  return Object.freeze({ ajv, validators: new Map<string, ValidateFunction>() });
 }
 
-const validators = buildValidators();
+const componentSchemaNameSet = new Set<string>(COMPONENT_SCHEMA_NAMES);
+
+function getValidator(name: string): ValidateFunction | undefined {
+  if (!componentSchemaNameSet.has(name)) {
+    return undefined;
+  }
+  validationRuntime ??= buildValidationRuntime();
+  const existing = validationRuntime.validators.get(name);
+  if (existing) {
+    return existing;
+  }
+  const validator = validationRuntime.ajv.compile({
+    $ref: `${OPENAPI_RUNTIME_SCHEMA_ID}#/$defs/${jsonPointerSegment(name)}`,
+  });
+  validationRuntime.validators.set(name, validator);
+  return validator;
+}
 
 export const contractSchemaNames: readonly ContractSchemaName[] = Object.freeze(
   [...COMPONENT_SCHEMA_NAMES] as ContractSchemaName[],
@@ -68,7 +126,7 @@ export function validateContractSchema<Name extends ContractSchemaName>(
   name: Name,
   value: unknown,
 ): ContractValidationResult<Name> {
-  const validator = validators.get(name);
+  const validator = getValidator(name);
   if (!validator) {
     return Object.freeze({
       ok: false,
@@ -87,7 +145,7 @@ export function validateContractSchema<Name extends ContractSchemaName>(
   }
   return Object.freeze({
     ok: false,
-    issues: Object.freeze((validator.errors ?? []).map(toIssue)),
+    issues: Object.freeze((validator.errors ?? []).slice(0, MAX_VALIDATION_ISSUES).map(toIssue)),
   });
 }
 

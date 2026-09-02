@@ -8,7 +8,9 @@ import {
   contractSchemaNames,
   parseContractSchema,
   validateContractSchema,
+  type ContractSchemaName,
 } from '../src/index.js';
+import { OPENAPI_RUNTIME_SCHEMA_DOCUMENT } from '../src/generated/runtime-schema.generated.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const validSearchRequest = Object.freeze({
@@ -24,6 +26,14 @@ const validSearchRequest = Object.freeze({
   product_context_ref: null,
   top_k: 3,
 });
+const duplicateSourceBindings = Object.freeze([
+  Object.freeze({ domain: 'presale', source_version_id: 'srcv_a' }),
+  Object.freeze({ domain: 'presale', source_version_id: 'srcv_b' }),
+]);
+const duplicateSourceBindingStatuses = Object.freeze([
+  Object.freeze({ domain: 'presale', source_version_id: 'srcv_a', source_ref: 'SRC-A' }),
+  Object.freeze({ domain: 'presale', source_version_id: 'srcv_b', source_ref: 'SRC-B' }),
+]);
 
 describe('generated customer-agent runtime contracts', () => {
   it('keeps generated artifacts byte-for-byte reproducible', () => {
@@ -43,8 +53,31 @@ describe('generated customer-agent runtime contracts', () => {
       intake_status: 'VERIFIED_NOT_ACTIVATED',
       runtime_activated: false,
     });
-    expect(contractSchemaNames).toContain('SearchRequest');
-    expect(contractSchemaNames.length).toBeGreaterThan(100);
+    const runtimeDefinitions = (OPENAPI_RUNTIME_SCHEMA_DOCUMENT as {
+      $defs: Record<string, unknown>;
+    }).$defs;
+    expect(contractSchemaNames).toHaveLength(132);
+    expect(CONTRACT_PROVENANCE.component_schema_count).toBe(132);
+    expect(Object.keys(runtimeDefinitions)).toEqual([...contractSchemaNames]);
+    expect(runtimeDefinitions).toMatchObject({
+      FileImportRequest: {
+        properties: { source_bindings: { 'x-unique-by': 'domain' } },
+      },
+      FeishuImportRequest: {
+        properties: { source_bindings: { 'x-unique-by': 'domain' } },
+      },
+      ImportStatusResponseBase: {
+        properties: { source_bindings: { 'x-unique-by': 'domain' } },
+      },
+    });
+  });
+
+  it('compiles every generated component schema on demand', () => {
+    expect(() => {
+      for (const name of contractSchemaNames) {
+        validateContractSchema(name, null);
+      }
+    }).not.toThrow();
   });
 
   it('accepts a contract-valid search request', () => {
@@ -93,6 +126,63 @@ describe('generated customer-agent runtime contracts', () => {
       chosen_script_id: null,
       push_method: null,
     }).ok).toBe(false);
+  });
+
+  it.each([
+    ['FileImportRequest', {
+      file: 'fixture.csv',
+      source_bindings: duplicateSourceBindings,
+    }],
+    ['FeishuImportRequest', {
+      source_type: 'feishu_api',
+      source_bindings: duplicateSourceBindings,
+    }],
+    ['ImportStatusResponseBase', {
+      import_batch_id: 'batch-001',
+      status: 'validating',
+      base_release_id: null,
+      source_binding_hash: 'a'.repeat(64),
+      source_bindings: duplicateSourceBindingStatuses,
+      error_report: null,
+      staged_count: 0,
+      clean_count: 0,
+      quarantined_count: 0,
+      quality_gate_passed: false,
+      quality_review: null,
+      preview: [],
+    }],
+  ] as const)('rejects duplicate source domains in %s', (schemaName, payload) => {
+    const result = validateContractSchema(schemaName as ContractSchemaName, payload);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual(expect.objectContaining({ keyword: 'x-unique-by' }));
+    }
+  });
+
+  it('fails closed for unknown runtime schema names and bounds diagnostics', () => {
+    const unknown = validateContractSchema('MissingSchema' as ContractSchemaName, {});
+    expect(unknown).toEqual({
+      ok: false,
+      issues: [{
+        instancePath: '',
+        schemaPath: '',
+        keyword: 'schema',
+        message: 'unknown contract component schema',
+      }],
+    });
+
+    const invalid = validateContractSchema('SearchRequest', {
+      ...validSearchRequest,
+      ...Object.fromEntries(Array.from({ length: 100 }, (_, index) => [`extra_${index}`, index])),
+    });
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) {
+      expect(invalid.issues.length).toBeLessThanOrEqual(16);
+    }
+  });
+
+  it('returns valid payloads from strict parse boundaries', () => {
+    expect(parseContractSchema('SearchRequest', validSearchRequest)).toBe(validSearchRequest);
   });
 
   it('throws a scrubbed typed error at strict parse boundaries', () => {

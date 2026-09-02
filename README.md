@@ -161,7 +161,7 @@ pnpm test:e2e
 
 | 命令 | 实际覆盖 | 不要误读成 |
 | --- | --- | --- |
-| `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的生成物零漂移；132 个 component schema 可编译及正反边界校验 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
+| `pnpm contracts:codegen:check` / `pnpm test:contract` | 双哈希输入对应的五类生成物零漂移；132 个 component schema 可编译、验证扩展生效，且编译后的公开包入口可由 Node 24 加载 | 正式 API 已启动、migration 已执行或 runtime 已激活 |
 | `pnpm test:float` | overlay 几何 / 姿态 / 探头权限 / FoxApp 组件 | **不含**完整 Main drag-settle（那是 `apps/desktop/tests/unit/overlay-controller-fox-settle.test.ts`，在 `pnpm test` 里） |
 | `pnpm test:assets` | 核对仓内现有狐狸与 App 图标合同 | **不等于生成**图标；要派生请显式 `pnpm generate:fox-head` |
 | `pnpm test:e2e:float` | 先 `pnpm build`，再跑 `smoke.spec.ts` 里 `@float` | 不是全量 E2E，也不是真实台前调度验收 |

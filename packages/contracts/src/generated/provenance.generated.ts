@@ -33,8 +33,8 @@ export const CONTRACT_PROVENANCE = Object.freeze({
     },
     "runtime_schema": {
       "path": "packages/contracts/src/generated/runtime-schema.generated.ts",
-      "sha256": "5d10f775f3a40b8eea6f810027682032a0003e6a41a0b4d51f4740ce78d8a86c",
-      "bytes": 100239
+      "sha256": "587214f913b15a17d7c33f02e528324e63b3360af0c3977427bb38e1198664e3",
+      "bytes": 100344
     }
   }
 });
