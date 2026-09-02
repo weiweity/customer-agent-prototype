@@ -5,8 +5,8 @@
 > **开始日期：** 2026-08-31
 > **组织门输入：** `DEC-DDEV-01=PASS`，证据索引 `EVD-DDEV-AUTH-20260831`
 > **产品仓开工输入：** 用户已明确授权“开工授权 / DEV-M0 产品仓开工授权”
-> **当前切片：** `DEV-M0-W2 · contract codegen / runtime validation · PR #10 REVIEW REMEDIATION`
-> **W2 开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”；提交、推送、PR 与 Review 均已按独立授权推进，Review 修复以 `cd9878e` 为固定基线且尚未提交
+> **当前切片：** `DEV-M0-W2 · contract codegen / runtime validation · PR #10 LANDING AUTHORIZED`
+> **W2 开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”；提交、推送、PR、Review 修复提交与推送均已按独立授权完成，Review 修复候选头为 `74e2a97`；后续 Review 复核、合并与候选分支清理亦已获得明确授权
 > **W1 开工输入：** 用户于 2026-08-31 明确给出“产品仓 W1 分支创建与开工授权（基于 6111272）”；该授权不包含 W1 提交、推送、PR、合并、部署或后续正式能力切片
 > **W0 历史输入：** 用户曾明确给出“产品仓 W0 提交授权”；W0 已通过独立 Git 门完成，不自动扩张到 W1
 > **不代表：** 真实数据、飞书运行接入、Pilot、付费调用、自动发送、部署或发布授权；本记录的状态本身不扩张任何 Git 权限
@@ -102,7 +102,7 @@ W1 未生成 DMG、ZIP 或 Windows 安装包；打包路径和资源合同已由
 
 ## 9. W2 当前状态与下一切片
 
-W1 已通过独立 Git 门合并为 `6c759c6b317d9382787dcec200f3e828b7a5007d`。W2 候选头 `cd9878e437ca0397a54de621f2a5e23c710150f3` 已推送并创建 PR #10；只读 Review 发现运行时包缺少可执行 JS 入口，以及 `x-unique-by` 校验语义被 codegen 删除。当前 Review 修复工作树已补齐 `dist` 构建与公开入口、扩展关键字校验、共享快照锁、延迟编译/有限错误诊断及定向回归；它仍须经过独立提交、推送、复核与合并门。
+W1 已通过独立 Git 门合并为 `6c759c6b317d9382787dcec200f3e828b7a5007d`。W2 候选头 `74e2a975386c0a97fd6c66c9853e2edad4f751bc` 已推送至 PR #10；只读 Review 发现的可执行 JS 入口、`x-unique-by` 校验语义、共享快照锁与有限错误诊断问题均已修复并完成定向回归。Review 复核、合并与候选分支清理已获授权，实际落地主提交以 PR #10 和 `main` 历史为准。
 
 W2 合并后，下一项产品能力仍应单独授权：进入 API/config/DB 的后续 `DEV-M0` 纵向切片。本记录不授权 Fastify、migration、PostgreSQL、真实数据或运行时激活。
 
