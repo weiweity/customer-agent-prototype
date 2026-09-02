@@ -161,12 +161,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
 
       const locker = await harness.connect(database.config);
       try {
-        await locker.query('SELECT pg_advisory_lock(1129531209, 4)');
+        await locker.query('SELECT pg_advisory_lock($1::integer, $2::integer)', [1_129_531_209, 4]);
         await expect(applyDatabaseMigrations(client, { lockTimeoutMs: 75 })).rejects.toMatchObject({
           code: 'MIGRATION_LOCK_TIMEOUT',
         });
       } finally {
-        await locker.query('SELECT pg_advisory_unlock(1129531209, 4)');
+        await locker.query('SELECT pg_advisory_unlock($1::integer, $2::integer)', [1_129_531_209, 4]);
         await locker.end();
       }
 

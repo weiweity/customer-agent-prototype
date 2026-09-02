@@ -7,7 +7,7 @@ describe('database migration runner errors', () => {
   it('normalizes advisory-lock query failures', async () => {
     const client = {
       query: async () => {
-        throw Object.assign(new Error('postgres://secret@database.internal/customer'), {
+        throw Object.assign(new Error('SENSITIVE_CONNECTION_DETAIL_DO_NOT_ECHO'), {
           code: '08006',
           detail: 'CONNECTION_FAILURE',
         });

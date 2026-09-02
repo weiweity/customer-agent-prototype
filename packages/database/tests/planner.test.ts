@@ -68,7 +68,7 @@ describe('database migration planner', () => {
   it('normalizes status-query failures without echoing connection details', async () => {
     const client = {
       query: async () => {
-        throw Object.assign(new Error('postgres://secret@database.internal/customer'), {
+        throw Object.assign(new Error('SENSITIVE_CONNECTION_DETAIL_DO_NOT_ECHO'), {
           code: '08006',
           detail: 'CONNECTION_FAILURE',
         });

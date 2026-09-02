@@ -82,7 +82,7 @@ pnpm test:db              # unit + package smoke + 隔离 PG15 集成门禁
 pnpm test:db:integration  # 只重跑隔离 PG15 集成门禁
 ```
 
-`pnpm test` 只跑 database 的 unit/package smoke，不要求每位普通前端开发者安装 PostgreSQL；改动 migration、runner、verifier 或 PG harness 时必须另跑 `pnpm test:db`。这台开发机已验证 `/Users/hutou/homebrew/opt/postgresql@15/bin`，其他电脑可通过 `CUSTOMER_AGENT_PG15_BIN` 指向自己的 PostgreSQL 15 `bin` 目录。
+`pnpm test` 只跑 database 的 unit/package smoke，不要求每位普通前端开发者安装 PostgreSQL；改动 migration、runner、verifier 或 PG harness 时必须另跑 `pnpm test:db`。其他电脑可通过 `CUSTOMER_AGENT_PG15_BIN` 指向自己的 PostgreSQL 15 `bin` 目录；Homebrew 安装可使用 `$(brew --prefix postgresql@15)/bin`。
 
 上面的 PATH 是这台开发机已核实的 Node 24 安装位置；若迁移到别的电脑，请改用该电脑的 Node 24 路径。`NODE_OPTIONS=--use-system-ca` 与 `NODE_EXTRA_CA_CERTS` 只用于**当前这台机器**的企业证书环境，不是每台电脑的通用要求；没有企业拦截 TLS 时不要照抄。禁止关闭 TLS 验证。本项目用 `pnpm electron:install` 在唯一桌面包内显式准备锁定版本的 Electron 运行时；后续启动会复用本机缓存。应用不访问外部业务网络；`pnpm dev` 仅连接本机 Vite/HMR。逐步操作见 [第一次运行](docs/tutorial-first-run.md)。
 
