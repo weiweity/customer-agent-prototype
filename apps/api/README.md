@@ -11,8 +11,9 @@
 - auth/storage/content 尚未由 M1/M2 实现，因此三项固定 `not_ready`，W5 的 `/ready` 正常结果仍是 503，而不是业务已可用。
 - `/v1/*`、migration 自动执行、storage、OAuth、真实数据、桌面 adapter 和 runtime activation 都未实现。
 - 启动与 readiness 失败只输出稳定字段，不回显环境变量值、token、DSN、SQL 或异常正文。
-- 同一时刻只运行一个 readiness 探针；连接等待与 readiness 响应分别由 `DB_CONNECTION_TIMEOUT_MS`、`DB_READINESS_TIMEOUT_MS` 控制。
-- W5 只接受 loopback 或本机 Unix socket PostgreSQL；任意远程 DSN 均在建池前拒绝，托管数据库/TLS 属于后续部署设计。
+- 同一时刻只运行一个 readiness 探针；连接等待与 readiness 响应分别由 `DB_CONNECTION_TIMEOUT_MS`、`DB_READINESS_TIMEOUT_MS` 控制，timer 与单调时钟都会拒绝 deadline 后才完成的成功结果。
+- schema 探针锁定 8 个 search/传递函数、2 个视图、`pgcrypto.digest` extension owner、双向角色成员与当前数据库/全部用户 schema 的精确有效 ACL；任意非 owner 的 `public CREATE` 失败关闭。
+- W5 只接受 `127.0.0.1`、`localhost` 或本机 Unix socket PostgreSQL；任意远程或括号 IPv6 DSN 均在建池前拒绝，托管数据库/TLS 属于后续部署设计。
 
 配置合同与拒启矩阵见 [`docs/reference-api-runtime-config.md`](../../docs/reference-api-runtime-config.md)。
 

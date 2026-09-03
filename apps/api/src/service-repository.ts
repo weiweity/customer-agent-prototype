@@ -17,6 +17,7 @@ export type ServiceRepository = Readonly<{
 }>;
 
 type RuntimePool = Pick<Pool, 'query' | 'end' | 'on'>;
+type RuntimeClock = () => number;
 
 class RuntimePoolClient extends Client {
   readonly runtimeConnectionStartedAt = performance.now();
@@ -34,15 +35,24 @@ export function runtimeConnectionExceededDeadline(
 function verifyRuntimeConnectionDeadline(
   client: PoolClient,
   timeoutMs: number,
+  now: number,
   done: (error?: Error) => void,
 ): void {
   const startedAt = Reflect.get(client, 'runtimeConnectionStartedAt');
   if (typeof startedAt !== 'number'
-    || runtimeConnectionExceededDeadline(startedAt, timeoutMs)) {
+    || runtimeConnectionExceededDeadline(startedAt, timeoutMs, now)) {
     done(new Error('Runtime database connection exceeded its configured deadline'));
     return;
   }
   done();
+}
+
+/** Internal deterministic test seam for the exact callback passed to pg-pool. */
+export function createRuntimePoolVerify(
+  timeoutMs: number,
+  now: RuntimeClock = () => performance.now(),
+): (client: PoolClient, done: (error?: Error) => void) => void {
+  return (client, done) => verifyRuntimeConnectionDeadline(client, timeoutMs, now(), done);
 }
 
 interface RuntimeSchemaProbeRow extends QueryResultRow {
@@ -56,7 +66,7 @@ interface RuntimeSchemaProbeRow extends QueryResultRow {
 }
 
 const EXPECTED_SCHEMA_PREFIX = `CS-AI-C11 ${CONTRACT_PROVENANCE.database_version};`;
-const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = 'f27e67ab7deadad1de5e759c4dc4f5f8c861d81355a785d6096980712c299915';
+const EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256 = 'ff7fe110f2d5f097928bcd09e82f4cfa568972aa87e6d56578d99e338c046b58';
 const RUNTIME_SCHEMA_PROBE = `
   WITH expected_runtime_relation_acl(relation_name, privilege_type) AS (
     VALUES
@@ -123,6 +133,9 @@ const RUNTIME_SCHEMA_PROBE = `
       ('public.content_scope_matches(text[],text,text[],text,text,text)'),
       ('public.content_questions_source_assets_are_active(jsonb)'),
       ('public.content_questions_are_valid(jsonb)'),
+      ('public.content_question_hash(jsonb)'),
+      ('public.jsonb_jcs(jsonb)'),
+      ('public.content_utc_timestamp_text(timestamp with time zone)'),
       ('public.digest(bytea,text)')
   ),
   guarded_user_schemas AS (
@@ -213,6 +226,11 @@ const RUNTIME_SCHEMA_PROBE = `
           )
           AND NOT EXISTS (
             SELECT 1
+            FROM pg_catalog.pg_auth_members login_member
+            WHERE login_member.roleid = login.oid
+          )
+          AND NOT EXISTS (
+            SELECT 1
             FROM pg_catalog.pg_parameter_acl parameter_acl
             JOIN LATERAL pg_catalog.aclexplode(parameter_acl.paracl) acl ON true
             WHERE acl.grantee IN (0, login.oid, runtime_role.oid, definer_role.oid)
@@ -265,6 +283,11 @@ const RUNTIME_SCHEMA_PROBE = `
             LEFT JOIN LATERAL pg_catalog.aclexplode(guarded_schema.nspacl) acl ON true
             WHERE guarded_schema.nspowner IN (login.oid, runtime_role.oid, definer_role.oid)
                 OR acl.grantee = login.oid
+                OR (
+                  guarded_schema.nspname = 'public'
+                  AND acl.privilege_type = 'CREATE'
+                  AND acl.grantee <> guarded_schema.nspowner
+                )
                 OR (
                   acl.grantee = 0
                   AND (
@@ -498,7 +521,7 @@ const RUNTIME_SCHEMA_PROBE = `
             'search_path=pg_catalog, public, pg_temp'
           ]::text[]
           AND (
-            SELECT pg_catalog.count(*) = 7
+            SELECT pg_catalog.count(*) = 10
               AND pg_catalog.encode(
                 pg_catalog.sha256(
                   pg_catalog.convert_to(
@@ -509,6 +532,22 @@ const RUNTIME_SCHEMA_PROBE = `
                 'hex'
               ) = '${EXPECTED_SEARCH_BOUNDARY_MANIFEST_SHA256}'
             FROM search_dependency_manifest
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_proc extension_function
+            JOIN pg_catalog.pg_depend extension_dependency
+              ON extension_dependency.classid = 'pg_catalog.pg_proc'::pg_catalog.regclass
+              AND extension_dependency.objid = extension_function.oid
+              AND extension_dependency.refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+              AND extension_dependency.deptype = 'e'
+            JOIN pg_catalog.pg_extension trusted_extension
+              ON trusted_extension.oid = extension_dependency.refobjid
+              AND trusted_extension.extname = 'pgcrypto'
+            WHERE extension_function.oid = pg_catalog.to_regprocedure(
+                'public.digest(bytea,text)'
+              )
+              AND extension_function.proowner = trusted_extension.extowner
           )
           AND pg_catalog.has_function_privilege(
             session_user,
@@ -571,6 +610,7 @@ class PostgresServiceRepository implements ServiceRepository {
     private readonly pool: RuntimePool,
     private readonly readinessTimeoutMs: number,
     private readonly diagnosticSink: ApiRuntimeDiagnosticSink,
+    private readonly now: RuntimeClock,
   ) {
     // node-postgres emits idle-client failures on Pool itself. Consume the event
     // so it cannot crash the process. pg-pool already evicts that idle client;
@@ -585,16 +625,29 @@ class PostgresServiceRepository implements ServiceRepository {
     if (this.closed) return Promise.resolve(freezeChecks('not_ready', 'not_ready'));
     if (this.activeProbe !== null) return this.activeProbe.response;
 
+    const startedAt = this.now();
+    let deadlineReported = false;
+    const deadlineFailure = (): ServiceReadinessChecks => {
+      if (!deadlineReported) {
+        deadlineReported = true;
+        this.report('DATABASE_READINESS_DEADLINE_EXCEEDED');
+      }
+      return freezeChecks('not_ready', 'not_ready');
+    };
     const operation = this.executeProbe();
+    const checkedOperation = operation.then((checks) => (
+      runtimeConnectionExceededDeadline(startedAt, this.readinessTimeoutMs, this.now())
+        ? deadlineFailure()
+        : checks
+    ));
     let deadline: ReturnType<typeof setTimeout>;
     const bounded = new Promise<ServiceReadinessChecks>((resolve) => {
       deadline = setTimeout(() => {
-        this.report('DATABASE_READINESS_DEADLINE_EXCEEDED');
-        resolve(freezeChecks('not_ready', 'not_ready'));
+        resolve(deadlineFailure());
       }, this.readinessTimeoutMs);
       deadline.unref?.();
     });
-    const response = Promise.race([operation, bounded]);
+    const response = Promise.race([checkedOperation, bounded]);
     this.activeProbe = Object.freeze({ operation, response });
     void operation.finally(() => {
       clearTimeout(deadline);
@@ -656,9 +709,7 @@ export function createServiceRepository(
     idle_in_transaction_session_timeout: 10_000,
     application_name: 'cs-ai-api',
     maxLifetimeSeconds: 300,
-    verify: (client, done) => {
-      verifyRuntimeConnectionDeadline(client, config.connectionTimeoutMs, done);
-    },
+    verify: createRuntimePoolVerify(config.connectionTimeoutMs),
   }), {
     readinessTimeoutMs: config.readinessTimeoutMs,
     diagnosticSink,
@@ -671,6 +722,7 @@ export function createServiceRepositoryForPool(
   options: Readonly<{
     readinessTimeoutMs?: number;
     diagnosticSink?: ApiRuntimeDiagnosticSink;
+    now?: RuntimeClock;
   }> = {},
 ): ServiceRepository {
   const readinessTimeoutMs = options.readinessTimeoutMs ?? 2_000;
@@ -681,5 +733,6 @@ export function createServiceRepositoryForPool(
     pool,
     readinessTimeoutMs,
     options.diagnosticSink ?? (() => undefined),
+    options.now ?? (() => performance.now()),
   );
 }

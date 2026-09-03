@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startApi } from '@customer-agent/api';
 
-test('compiled API package serves its contract-valid health route', async () => {
+test('compiled API package serves its contract-valid health and readiness routes', async () => {
   const started = await startApi({
     environment: {
       CUSTOMER_AGENT_PROFILE: 'test',
@@ -20,6 +20,19 @@ test('compiled API package serves its contract-valid health route', async () => 
       status: 'ok',
       service: 'cs-ai-api',
       version: '0.2.0-w5-package',
+    });
+
+    const readiness = await fetch(`${started.address}/ready`);
+    assert.equal(readiness.status, 503);
+    assert.deepEqual(await readiness.json(), {
+      status: 'not_ready',
+      checks: {
+        database: 'not_ready',
+        schema: 'not_ready',
+        auth: 'not_ready',
+        storage: 'not_ready',
+        content: 'not_ready',
+      },
     });
   } finally {
     await started.close();

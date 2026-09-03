@@ -18,6 +18,7 @@ import {
   parseApiRuntimeConfig,
 } from '../src/runtime-config.js';
 import {
+  createRuntimePoolVerify,
   createServiceRepository,
   createServiceRepositoryForPool,
   runtimeConnectionExceededDeadline,
@@ -204,10 +205,11 @@ describe('Application API bootstrap', () => {
       [{ DATABASE_URL: '' }, 'DATABASE_URL'],
       [{ DATABASE_URL: 'https://database.example/w5' }, 'DATABASE_URL'],
       [{ DATABASE_URL: 'postgresql://database.example/w5' }, 'DATABASE_URL'],
-      [{ DATABASE_URL: 'postgresql://database.example/' }, 'DATABASE_URL'],
-      [{ DATABASE_URL: 'postgresql://database.example/w5?query_timeout=900000' }, 'DATABASE_URL'],
-      [{ DATABASE_URL: 'postgresql://database.example/w5?application_name=override' }, 'DATABASE_URL'],
-      [{ DATABASE_URL: 'postgresql://database.example/w5?host=%2Ftmp%2Fa&host=%2Ftmp%2Fb' }, 'DATABASE_URL'],
+      [{ DATABASE_URL: 'postgresql://w5_runtime@127.0.0.1/' }, 'DATABASE_URL'],
+      [{ DATABASE_URL: 'postgresql://w5_runtime@127.0.0.1/w5?query_timeout=900000' }, 'DATABASE_URL'],
+      [{ DATABASE_URL: 'postgresql://w5_runtime@127.0.0.1/w5?application_name=override' }, 'DATABASE_URL'],
+      [{ DATABASE_URL: 'postgresql://w5_runtime@127.0.0.1/w5?host=%2Ftmp%2Fa&host=%2Ftmp%2Fb' }, 'DATABASE_URL'],
+      [{ DATABASE_URL: 'postgresql://w5_runtime@[::1]/w5' }, 'DATABASE_URL'],
       [{ DB_POOL_MAX: '0' }, 'DB_POOL_MAX'],
       [{ DB_POOL_MAX: '21' }, 'DB_POOL_MAX'],
       [{ DB_CONNECTION_TIMEOUT_MS: '10001' }, 'DB_CONNECTION_TIMEOUT_MS'],
@@ -356,6 +358,47 @@ describe('ServiceRepository readiness', () => {
     expect(runtimeConnectionExceededDeadline(100, 50, 149.999)).toBe(false);
     expect(runtimeConnectionExceededDeadline(100, 50, 150)).toBe(true);
     expect(runtimeConnectionExceededDeadline(100, 50, 151)).toBe(true);
+
+    const done = vi.fn();
+    const verify = createRuntimePoolVerify(50, () => 150);
+    verify({ runtimeConnectionStartedAt: 100 } as never, done);
+    expect(done).toHaveBeenCalledOnce();
+    expect(done.mock.calls[0]?.[0]).toMatchObject({
+      message: 'Runtime database connection exceeded its configured deadline',
+    });
+  });
+
+  it('fails closed when a successful probe settles at or after its response deadline', async () => {
+    let now = 100;
+    let resolveQuery!: (value: { rows: ReturnType<typeof schemaRow>[] }) => void;
+    const query = vi.fn(() => new Promise<{ rows: ReturnType<typeof schemaRow>[] }>((resolve) => {
+      resolveQuery = resolve;
+    }));
+    const pool = {
+      query,
+      end: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn().mockReturnThis(),
+    };
+    const diagnostics = vi.fn();
+    const repository = createServiceRepositoryForPool(pool as never, {
+      readinessTimeoutMs: 25,
+      diagnosticSink: diagnostics,
+      now: () => now,
+    });
+
+    const readiness = repository.readiness();
+    now = 125;
+    resolveQuery({ rows: [schemaRow()] });
+
+    await expect(readiness).resolves.toEqual({
+      ...W5_NOT_READY,
+      database: 'not_ready',
+      schema: 'not_ready',
+    });
+    expect(diagnostics).toHaveBeenCalledOnce();
+    expect(diagnostics).toHaveBeenCalledWith({
+      code: 'DATABASE_READINESS_DEADLINE_EXCEEDED',
+    });
   });
 
   it('uses one schema and ACL probe while keeping later capabilities hard-off', async () => {
@@ -521,6 +564,7 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
     let originalSearchFunctionDefinition: string | undefined;
     let originalScopeFunctionDefinition: string | undefined;
     let originalQuestionValidationDefinition: string | undefined;
+    let originalQuestionHashDefinition: string | undefined;
     try {
       const expectSchemaNotReady = async () => {
         await expect(repository.readiness()).resolves.toMatchObject({
@@ -554,6 +598,15 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       originalQuestionValidationDefinition = questionValidationDefinition.rows[0]?.function_definition;
       if (!originalQuestionValidationDefinition) {
         throw new Error('Expected the frozen question validation function definition');
+      }
+      const questionHashDefinition = await owner.query<{ function_definition: string }>(`
+        SELECT pg_catalog.pg_get_functiondef(
+          'public.content_question_hash(jsonb)'::pg_catalog.regprocedure
+        ) AS function_definition
+      `);
+      originalQuestionHashDefinition = questionHashDefinition.rows[0]?.function_definition;
+      if (!originalQuestionHashDefinition) {
+        throw new Error('Expected the frozen question hash function definition');
       }
 
       await owner.query('GRANT SELECT ON public.content_current TO w5_runtime');
@@ -591,6 +644,13 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await expectSchemaNotReady();
       await owner.query('REVOKE cs_ai_definer FROM w5_definer_attacker');
       await owner.query('DROP ROLE w5_definer_attacker');
+      await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
+
+      await owner.query('CREATE ROLE w5_unlisted_login LOGIN');
+      await owner.query('GRANT w5_runtime TO w5_unlisted_login');
+      await expectSchemaNotReady();
+      await owner.query('REVOKE w5_runtime FROM w5_unlisted_login');
+      await owner.query('DROP ROLE w5_unlisted_login');
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
       await owner.query('GRANT SET ON PARAMETER session_replication_role TO w5_runtime');
@@ -687,6 +747,13 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await owner.query('GRANT CREATE ON SCHEMA public TO PUBLIC');
       await expectSchemaNotReady();
       await owner.query('REVOKE CREATE ON SCHEMA public FROM PUBLIC');
+      await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
+
+      await owner.query('CREATE ROLE w5_public_schema_writer NOLOGIN');
+      await owner.query('GRANT CREATE ON SCHEMA public TO w5_public_schema_writer');
+      await expectSchemaNotReady();
+      await owner.query('REVOKE CREATE ON SCHEMA public FROM w5_public_schema_writer');
+      await owner.query('DROP ROLE w5_public_schema_writer');
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
       await owner.query(`
@@ -806,6 +873,21 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await owner.query(originalQuestionValidationDefinition);
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
+      await owner.query(`
+        CREATE OR REPLACE FUNCTION public.content_question_hash(
+          p_question JSONB
+        ) RETURNS TEXT
+        LANGUAGE sql
+        IMMUTABLE
+        STRICT
+        PARALLEL SAFE
+        SET search_path = pg_catalog, public, pg_temp
+        AS 'SELECT repeat(''0'', 64)'
+      `);
+      await expectSchemaNotReady();
+      await owner.query(originalQuestionHashDefinition);
+      await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
+
       await owner.query('CREATE ROLE w5_alternate_definer NOLOGIN');
       await owner.query(`
         ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
@@ -816,6 +898,13 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
         ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
         OWNER TO cs_ai_definer
       `);
+      await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
+
+      await owner.query('CREATE ROLE w5_digest_owner NOLOGIN');
+      await owner.query('ALTER FUNCTION public.digest(BYTEA,TEXT) OWNER TO w5_digest_owner');
+      await expectSchemaNotReady();
+      await owner.query(`ALTER FUNCTION public.digest(BYTEA,TEXT) OWNER TO "${harness.owner}"`);
+      await owner.query('DROP ROLE w5_digest_owner');
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
       await owner.query('CREATE ROLE w5_default_function_owner NOLOGIN');
@@ -854,12 +943,17 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       if (originalQuestionValidationDefinition) {
         await owner.query(originalQuestionValidationDefinition).catch(() => undefined);
       }
+      if (originalQuestionHashDefinition) {
+        await owner.query(originalQuestionHashDefinition).catch(() => undefined);
+      }
       await owner.query(`ALTER DATABASE "${database.name}" OWNER TO "${harness.owner}"`).catch(() => undefined);
       await owner.query('DROP SCHEMA IF EXISTS w5_extra_scope CASCADE').catch(() => undefined);
       await owner.query('DROP FUNCTION IF EXISTS public.w5_public_default_probe()').catch(() => undefined);
       await owner.query('DROP TABLE IF EXISTS public.w5_runtime_owned_probe').catch(() => undefined);
       await owner.query('REVOKE CREATE ON SCHEMA public FROM PUBLIC').catch(() => undefined);
+      await owner.query('REVOKE CREATE ON SCHEMA public FROM w5_public_schema_writer').catch(() => undefined);
       await owner.query('REVOKE CREATE ON SCHEMA public FROM w5_default_function_owner').catch(() => undefined);
+      await owner.query(`ALTER FUNCTION public.digest(BYTEA,TEXT) OWNER TO "${harness.owner}"`).catch(() => undefined);
       await owner.query(`
         ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
         OWNER TO cs_ai_definer
@@ -899,11 +993,15 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await owner.query('REVOKE SELECT ON public.content_current FROM w5_runtime').catch(() => undefined);
       await owner.query('REVOKE app_content_admin FROM w5_runtime').catch(() => undefined);
       await owner.query('REVOKE cs_ai_definer FROM w5_definer_attacker').catch(() => undefined);
+      await owner.query('REVOKE w5_runtime FROM w5_unlisted_login').catch(() => undefined);
       await owner.query('REVOKE app_runtime FROM w5_runtime').catch(() => undefined);
       await owner.query('GRANT app_runtime TO w5_runtime').catch(() => undefined);
       await owner.query('DROP ROLE IF EXISTS w5_default_function_owner').catch(() => undefined);
       await owner.query('DROP ROLE IF EXISTS w5_alternate_definer').catch(() => undefined);
       await owner.query('DROP ROLE IF EXISTS w5_definer_attacker').catch(() => undefined);
+      await owner.query('DROP ROLE IF EXISTS w5_unlisted_login').catch(() => undefined);
+      await owner.query('DROP ROLE IF EXISTS w5_public_schema_writer').catch(() => undefined);
+      await owner.query('DROP ROLE IF EXISTS w5_digest_owner').catch(() => undefined);
       await owner.end();
     }
   }, 120_000);

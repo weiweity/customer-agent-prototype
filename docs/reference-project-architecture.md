@@ -76,7 +76,7 @@ apps/api（W5）
 
 `DEV-M0-W4` 由 `packages/database` 单独拥有 DDL source split、不可变 SHA catalogue、`customer_agent_meta.schema_migrations` 账本、固定 advisory-lock key、逐 migration 事务与后验验证。生成器机械证明上游可执行区间完整且只归属一次；runner 要求调用方传入同一个已连接 `pg.Client`，并把 migration 与账本行放在同一事务。API startup 不调用这一控制面，runtime pool 不获得 migration-owner 能力。
 
-`DEV-M0-W5` 在 `apps/api/src/runtime-config.ts` 增加只在进程内传递、仅允许本机 PostgreSQL 的 DB bootstrap config，并由 `apps/api/src/service-repository.ts` 单独拥有一个 `pg.Pool`、schema 指纹、single-flight deadline、错误归一化与幂等关闭；`runtime-diagnostics.ts` 只输出稳定、脱敏的运行诊断词表。`GET /health` 不触碰依赖；`GET /ready` 通过一次只读查询核对 database、PostgreSQL 15、`schema.v1.12`、完整可信 search 依赖定义摘要、runtime/definer 双向角色边界、parameter ACL，以及 `app_runtime` 在当前数据库和全部用户 schema 中的精确表/列/函数有效 ACL，再把 auth/storage/content 明确保持为 `not_ready`。因此 W5 的服务可以监听并证明基础设施状态，但仍不会获得业务就绪或 runtime activation。
+`DEV-M0-W5` 在 `apps/api/src/runtime-config.ts` 增加只在进程内传递、仅允许本机 PostgreSQL 的 DB bootstrap config，并由 `apps/api/src/service-repository.ts` 单独拥有一个 `pg.Pool`、schema 指纹、single-flight deadline、错误归一化与幂等关闭；`runtime-diagnostics.ts` 只输出稳定、脱敏的运行诊断词表。`GET /health` 不触碰依赖；`GET /ready` 通过一次只读查询核对 database、PostgreSQL 15、`schema.v1.12`、8 个函数 + 2 个视图的完整可信 search 依赖摘要、`pgcrypto.digest` extension 所有权、runtime/login/definer 双向角色边界、parameter ACL，以及当前数据库和全部用户 schema 的精确表/列/函数有效 ACL。任意非 owner 的 `public CREATE` 与 deadline 后才完成的成功探针也失败关闭；auth/storage/content 明确保持为 `not_ready`。因此 W5 的服务可以监听并证明基础设施状态，但仍不会获得业务就绪或 runtime activation。
 
 ## 3. 三个窗口和安全边界
 
@@ -164,7 +164,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译、W3 API/config 与 W4 database migration 三个深模块：桌面包、合同包、API host 和数据库控制面的所有权分离，桌面运行时权限未放宽。W4 关闭的是“DDL 来源锁、migration/账本/事务与 PG15 N-only 后验”实现子项；它不关闭真实 DB 连接、鉴权、N-1 升级、业务端口或 DEV-M0 总门。
+当前目录结构已在 W1 mechanical move 基线上增加 W2 合同编译、W3 API/config、W4 database migration 和 W5 runtime repository/readiness：桌面包、合同包、API host、请求路径 pool 与数据库控制面的所有权分离，桌面运行时权限未放宽。W4 关闭“DDL 来源锁、migration/账本/事务与 PG15 N-only 后验”，W5 关闭“本机 runtime pool、schema/ACL 探针与失败关闭 readiness”实现子项；两者都不关闭真实数据、鉴权、N-1 升级、业务端口或 DEV-M0 总门。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 

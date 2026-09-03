@@ -29,6 +29,7 @@
 | 查看 W2 合同 codegen / runtime validation 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md](docs/plans/2026-09-02-dev-m0-w2-contract-codegen.md) |
 | 查看 W3 API/config bootstrap 的本地实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md](docs/plans/2026-09-02-dev-m0-w3-api-config-bootstrap.md) |
 | 查看 W4 PostgreSQL migration 控制面的实施边界与证据 | [docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md](docs/plans/2026-09-02-dev-m0-w4-postgres-migrations.md) |
+| 查看 W5 runtime pool / service readiness 的实施边界与证据 | [docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md](docs/plans/2026-09-03-dev-m0-w5-runtime-readiness.md) |
 | 推进 Menokin 试点的 S0 合成验证阶段，并核对红线和最小验收 | [docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md](docs/plans/2026-08-31-menokin-pilot-synthetic-stage.md) |
 | 了解产品文档生命周期，以及与项目状态仓的动态/历史边界 | [docs/reference-document-lifecycle.md](docs/reference-document-lifecycle.md) |
 | 理解为何采纳 actual bounds、为何 Dashboard 失败要留下查询 | [docs/explanation-failure-safe-lifecycle.md](docs/explanation-failure-safe-lifecycle.md) |

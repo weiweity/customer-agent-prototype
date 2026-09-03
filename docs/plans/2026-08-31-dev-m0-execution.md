@@ -5,7 +5,7 @@
 > **开始日期：** 2026-08-31
 > **组织门输入：** `DEC-DDEV-01=PASS`，证据索引 `EVD-DDEV-AUTH-20260831`
 > **产品仓开工输入：** 用户已明确授权“开工授权 / DEV-M0 产品仓开工授权”
-> **当前切片：** `DEV-M0-W5 · runtime adapter / service readiness · LOCAL RELEASE CANDIDATE · AWAITING COMMIT AUTHORIZATION`
+> **当前切片：** `DEV-M0-W5 · runtime adapter / service readiness · REVIEW FIX CANDIDATE · AWAITING REVIEW FIX COMMIT AUTHORIZATION（PR #14，本地基线 981ab403）`
 > **W2 开工输入：** 用户于 2026-09-02 明确给出“DEV-M0 合同开发与 codegen/runtime validation 开工授权”；提交、推送、PR、Review、合并与候选分支清理均已按独立授权完成，PR #10 squash 合并头为 `1a77297d51ce3cf3a0a551290675c60c941be4b6`
 > **W3 开工输入：** 用户于 2026-09-02 在 W2 有序落地后授权创建下一切片并本地实现/验证；后续提交、推送、PR、Review、合并与候选分支清理又按明确授权完成，PR #11 合并头为 `2758dba5bebefc3fce87fdc73cffb6a7122bbea7`
 > **W4 开工输入：** 用户于 2026-09-02 明确要求“开始启动下一个板块，我给你授权，全部一个个开始做”；本记录将该授权限制为 W4 的实现、验证与独立 Git 生命周期，不扩张到 W5、DEV-M1、真实数据、飞书运行接入、Pilot、部署或生产
@@ -421,6 +421,6 @@ Sequential implementation, no parallelization opportunity. 配置、repository�
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | N/A | 后端基础设施切片，无 UI 变化 |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | 不影响当前桌面启动路径 |
 
-**VERDICT:** W5 LOCAL RELEASE CANDIDATE — implementation, full validation and final review complete within the frozen scope; awaiting commit authorization.
+**VERDICT:** W5 REVIEW FIX CANDIDATE — PR #14 review findings are fixed and fully validated within the frozen scope; awaiting review-fix commit authorization.
 
 NO UNRESOLVED DECISIONS
