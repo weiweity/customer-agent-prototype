@@ -8,7 +8,9 @@ test('compiled API package serves its contract-valid health route', async () => 
       CUSTOMER_AGENT_PROFILE: 'test',
       AUTH_MODE: 'mock',
       CUSTOMER_AGENT_API_PORT: '0',
-      CUSTOMER_AGENT_BUILD_VERSION: '0.2.0-w3-package',
+      CUSTOMER_AGENT_BUILD_VERSION: '0.2.0-w5-package',
+      DATABASE_URL: 'postgresql://w5_package@127.0.0.1:1/w5_package',
+      DB_CONNECTION_TIMEOUT_MS: '100',
     },
   });
   try {
@@ -17,7 +19,7 @@ test('compiled API package serves its contract-valid health route', async () => 
     assert.deepEqual(await response.json(), {
       status: 'ok',
       service: 'cs-ai-api',
-      version: '0.2.0-w3-package',
+      version: '0.2.0-w5-package',
     });
   } finally {
     await started.close();
