@@ -75,7 +75,7 @@ function databaseEnvironment(overrides: Record<string, string> = {}) {
     CUSTOMER_AGENT_PROFILE: 'test',
     AUTH_MODE: 'mock',
     CUSTOMER_AGENT_API_PORT: '0',
-    DATABASE_URL: 'postgresql://w5_runtime:private-value@127.0.0.1:1/w5_test',
+    DATABASE_URL: 'postgresql://w5_runtime:PASSWORD@127.0.0.1:1/w5_test',
     DB_CONNECTION_TIMEOUT_MS: '100',
     DB_READINESS_TIMEOUT_MS: '100',
     ...overrides,
