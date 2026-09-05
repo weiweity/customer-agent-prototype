@@ -18,7 +18,7 @@
 - `PROJECT_CHARTER.md`、`DESIGN.md`、`DEVELOPMENT_BRIEF.md` 和 `docs/reference-*.md` 是产品当前边界、交互和工程知识的稳定文档。
 - 源码、测试和构建证据记录“产品实现事实”；它们不能替代批准记录、G0 / Ddev 或生产验收证据。
 - `CHANGELOG.md`、`TODOS.md` 和带日期的审查/验证材料保留历史变化；历史材料可以追加勘误，但不覆盖已发生的记录。
-- 当前 v3 运行模式仍是 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`。合成 fixture、Dashboard manifest 和本地运行结果不得写成真实接入、上线或客户验证。
+- 当前桌面 v3 运行模式仍是 `DEMO · MOCK AUTH · SYNTHETIC DATA · NO BACKEND`；NO BACKEND 仅指桌面未连接后端，不代表独立 Application API、合同、数据库与 Search + Events 未实现。合成 fixture、Dashboard manifest 和本地运行结果不得写成真实接入、上线或客户验证。
 
 ## 3. 修改与交接规则
 

@@ -5,7 +5,7 @@
 > **当前基线：** Menokin 是当前唯一客服试点；`DEV-M0` 与 `DEV-M1` 已完成，DEV-M1 W0～W5 通过 PR #17～#20 合并 mock auth / policy、受控 SearchBackend、Search + Events 事务和 50 条纯合成 runner（`main@5cf650c`，CI run `33785347931` 三条 lane 全绿）。`G1A-E0` T1～T3 已通过 PR #21 合并到 `main@be33c0e`，合并后 CI run `33849888116` 三条 lane 全绿；其证据仍是纯合成并固定为 `NOT_SIGNED / NOT_EVALUATED`。桌面仍未接 API，真实内容、飞书运行接入、部署与 Pilot 均未放行
 > **目录名说明：** `customer-agent-prototype` 是历史目录名，不再代表仓库只做原型。
 
-> **G1a 状态核对（2026-09-05）：** 上述 PR #21 是 T1～T3 的历史实现基线；共享来源装载修复已由 PR #24 合并至 `4dbee4b`。真实准入为 `T4 READY（历史静态验收，运行前重验）· T5 ATTEMPTED / BLOCKED · NOT_EVALUATED · T6 NOT SIGNED`，不构成上线或运行接入放行。后续动态进展查阅 [G1a 实施计划](docs/plans/2026-09-04-g1a-search-admission.md)，批准与真实证据以治理仓 `DEC-SEARCH-01` 为准。
+> **G1a 状态核对（2026-09-05）：** 上述 PR #21 是 T1～T3 的历史实现基线；共享来源装载修复已由 PR #24 合并至 `4dbee4b`。当前为 `T4 BLOCKED · T5 ATTEMPTED / BLOCKED · NOT_EVALUATED · T6 NOT SIGNED`，历史静态 READY 不代表当前可运行。四域业务版本已批准，负责人承接已确认；现行双审机器合同尚未转换，下一步是负责人承接合同落地与版本化新包准备，不重复要求业务重新审批，也不伪造第二审核人。后续动态进展查阅 [G1a 实施计划](docs/plans/2026-09-04-g1a-search-admission.md)，批准与真实证据以治理仓当前台账及追加决定为准。话术搜索上线是主线，AI 探索暂停；真实运行接入和上线尚未放行。
 
 ## 1. 两个仓库各自负责什么
 
