@@ -189,7 +189,7 @@ pnpm build
 
 ## 7. 当前架构评价
 
-当前目录结构已在 DEV-M0 基线上完成 DEV-M1 W0～W5，并已合并 G1A-E0 T1～T3：合同接收、组件校验、migration 控制面、API host、runtime 读写能力、policy-admin 写能力、SearchBackend、event transaction、legacy synthetic runner 与 test-only E0 runner 各有单一 owner，两个 API pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；DEV-M1 最终 `main@5cf650c`、CI run `33785347931` 三路全绿，候选产物仍明确不可部署且 `runtime_activated=false`。E0 的成功/失败清理和 50 条同形合成闭环已本地通过，但仍为 `NOT_SIGNED / NOT_EVALUATED`；真实数据、正式飞书鉴权、桌面接线、生产部署和真实 Windows 门均未放行。
+当前目录结构已在 DEV-M0 基线上完成 DEV-M1 W0～W5，并已合并 G1A-E0 T1～T3：合同接收、组件校验、migration 控制面、API host、runtime 读写能力、policy-admin 写能力、SearchBackend、event transaction、legacy synthetic runner 与 test-only E0 runner 各有单一 owner，两个 API pool 不共享登录，桌面运行时权限未放宽。v1.12→v1.14 与 v1.13→v1.14 都有精确后缀规划和 PG15 证明；DEV-M1 最终 `main@5cf650c`、CI run `33785779859` 三路全绿，候选产物仍明确不可部署且 `runtime_activated=false`。E0 的成功/失败清理和 50 条同形合成闭环已本地通过，但仍为 `NOT_SIGNED / NOT_EVALUATED`；真实数据、正式飞书鉴权、桌面接线、生产部署和真实 Windows 门均未放行。
 
 三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
 
