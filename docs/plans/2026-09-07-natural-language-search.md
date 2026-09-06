@@ -69,11 +69,17 @@
 
 输入词法试验采用[CPU中文句法模型](https://raw.githubusercontent.com/explosion/spacy-models/master/meta/zh_core_web_sm-3.8.0.json)、来源原文词表与保守同音字候选。十句结构样例只验证关键词保留；完整词表规则在已见开发题上仅36/52正向、35/35拒绝，未采用为搜索后端。独立40题的五个漏召回分别涉及同音错字、准备过程表述、维修寄送表述、否定疑问句，以及标准问题的简短关键词。后续应分开验证输入规范化与条件判定，不能靠扩大拒绝范围换取表面安全。
 
-四类判定复用267-token固定提示缓存，每题验证公共缓存未被修改；三个合成样例的缓存与非缓存贪心输出一致。237.30ms为40题模型判定与条件核对的逐题耗时相加后p95，不含召回、进程间通信、数据库、并发或冷启动；缓存初始化约348.77ms、模型加载约681.50ms。推理仍仅在本机Metal验证，不代表Windows或Linux运行证据。
+后续输入规范化开发试验保留原始输入，只对来源问题词表中的已知操作对象提出受限同音或漏字修正；歧义、已有合法词、否定及数字变化均拒绝修正。16项局部检查通过，但不证明通用错字覆盖。将前述已见数据合并为127题后，组合结果为63/72正向、55/55拒绝，仍有9项漏召回；全部属于开发结果，原独立40题的15/20结果保持不变。新增疑问句提示同时引入判定回退，不能将局部改善写成候选通过。
+
+对其中4项运费问题另做已知失败诊断：原文与条款调换顺序共8项正向全部错拒，4项明确责任方冲突全部拒绝；只保留相关条款或保留全文并标注相关条款的8项诊断也全部错拒。删除额外的“是否问句”布尔字段后，同样8项正向恢复4项，4项冲突仍拒绝，但对条款顺序仍不稳定。这仅证明本候选对输入格式敏感，不能确认“选错原文分支”为根因，也不支持采用分句选择或放松冲突门禁。诊断中的删减原文只用于定位，未成为展示或产品处理规则。诊断脚本另将数量解析统一为NFKC，5项纯函数检查通过；旧脚本、输入、期望与报告均保留，未覆盖历史证据。
+
+独立40题的四类判定复用267-token固定提示缓存，每题验证公共缓存未被修改；三个合成样例的缓存与非缓存贪心输出一致。237.30ms为40题模型判定与条件核对的逐题耗时相加后p95，不含召回、进程间通信、数据库、并发或冷启动；缓存初始化约348.77ms、模型加载约681.50ms。推理仍仅在本机Metal验证，不代表Windows或Linux运行证据。
 
 初始留出结果已用于架构比较，之后不再属于未见数据。新增问句对在对应运行前冻结，但只验证条件判断，不等于完整API、规模、并发、Windows/Linux或真实业务验证。p95不含完整搜索链，MLX设备性能不能外推其他平台；4B模型权重约2.3GB；最初四类实验Metal峰值约2.65GB，新增缓存实验约2.84GB。
 
 本机证据目录：`/Users/hutou/Documents/customer-agent-synthetic/search-model-spike-2026-09-07`。聚合与结果绑定分别为 `experiment-summary.json`、`condition-evidence-hashes.json`、`instruct-evidence-hashes.json`、`candidate-policy-evidence-hashes.json`、`policy-normalization-evidence-hashes.json`；模型锁文件保存revision和每个文件的SHA256。原始FAIL报告保留；本PR仅提交上述合成聚合，远端读者不能仅凭此文复现全部实验。
+
+规范化开发结果为 `result-normalized-policy-development.json`；条款顺序、相关条款和输入字段诊断分别为 `result-branch-order-diagnostic.json`、`result-branch-focus-diagnostic.json`、`result-branch-no-boolean-diagnostic.json`，各次运行前均保存输入和脚本哈希。上述新增证据仍为本机纯合成研究，没有进入API、真实G1a、桌面或安装包。
 
 公开技术依据：[两阶段检索](https://www.sbert.net/examples/sentence_transformer/applications/retrieve_rerank/README.html)、[本地模型配置](https://huggingface.co/docs/transformers.js/main/custom_usage)、[Qwen重排模型](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B)、[Qwen指令模型](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507)。这些文档只支持技术路线说明，不证明本项目达标。
 
