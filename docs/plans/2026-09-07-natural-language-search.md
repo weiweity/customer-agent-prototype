@@ -48,7 +48,7 @@
 
 ## 已完成实验及其限制
 
-实验全部使用仓外新造合成文本。模型固定公开revision及逐文件SHA256，推理在macOS宿主沙箱中拒绝网络和受控真实资料目录。运行未读取真实问题或调用外部模型API。模型权重、环境、脚本、输入和原始报告保留在本机实验目录，不进入产品依赖或安装包。
+实验全部使用仓外新造合成文本。生成、嵌入与重排模型固定公开revision及逐文件SHA256；句法试验固定软件和模型包版本，并记录本机模型文件哈希。推理在macOS宿主沙箱中拒绝网络和受控真实资料目录。运行未读取真实问题或调用外部模型API。模型权重、环境、脚本、输入和原始报告保留在本机实验目录，不进入产品依赖或安装包。
 
 | 实验 | 正向 / 拒绝结果 | 热判定p95 | 结论 |
 | --- | --- | --- | --- |
@@ -58,14 +58,22 @@
 | Qwen3-Reranker-0.6B条件判断，新增28问句对 | 15/15 · 3/13 | 52.41ms | FAIL |
 | Qwen3-4B-Instruct四类判断，新增24问句对 | 9/11 · 10/13 | 347.57ms | FAIL，单项超过现有300ms预算 |
 | 新展示规则：BGE相关性 + NLI矛盾检查 + 数量检查，新52题中的留出26题 | 14/16 · 9/10 | 187.58ms | FAIL，仍将更换锁芯召回为更换电池 |
+| 新规则短提示Qwen3-4B二类判定，新增35问句对 | 20/20 · 8/15 | 294.41ms | FAIL |
+| Qwen3-4B四类判定 + 条件原文核对，新增40问句对 | 15/20 · 20/20 | 237.30ms | FAIL，关键词、错字和疑问句仍有漏召回 |
 
 前三轮召回Top5均覆盖40/40合成正向目标，第一轮BGE重排也将40/40目标排在第一；困难在接受/拒绝判定。四类指令模型仍错误接受数量和运费承担方差异，不能直接接入。前五轮结果依据实验时的严格期望，用户随后确认展示规则，不追溯改分。
 
 第六轮按新规则单独冻结8条合成知识、52题及脚本，再运行已有本地模型。开发26题为15/16正向、10/10拒绝，相关性阈值仅按开发集选择；留出26题为14/16、9/10。NLI错拒错字和带条件的相关问题，也漏掉操作对象冲突；数量检查只是按单位比较数字序列，不是通用语义解析。新数据、旧数据及报告分别保留，没有调整留出题或在结果后改阈值。热延迟为新52题整体p95，仍不含API、数据库及规模/并发验证。
 
-初始留出结果已用于架构比较，之后不再属于未见数据。新增问句对在对应运行前冻结，但只验证条件判断，不等于完整API、规模、并发、Windows/Linux或真实业务验证。p95不含完整搜索链，MLX设备性能不能外推其他平台；4B模型约2.3GB，Metal峰值约2.65GB。
+后两轮继续使用已有本地4B权重。四类判定把“相关但未说明条件”与“明确冲突”分开；仅对前者增加原文分句、词汇、数量和否定核对。组合先在已见开发题得到48/52正向、35/35拒绝，再固定规则、提示、示例和文件哈希，运行全新40题；独立结果仍为FAIL。未用开发成绩替代新结果，也未在该次结果后更改阈值或期望。新增商品和问法仍复用了部分意图及句式，不能据此宣称跨语义簇泛化或G1a隔离验收。
 
-本机证据目录：`/Users/hutou/Documents/customer-agent-synthetic/search-model-spike-2026-09-07`。聚合与结果绑定分别为 `experiment-summary.json`、`condition-evidence-hashes.json`、`instruct-evidence-hashes.json`、`candidate-policy-evidence-hashes.json`；模型锁文件保存revision和每个文件的SHA256。原始FAIL报告保留；本PR仅提交上述合成聚合，远端读者不能仅凭此文复现全部实验。
+输入词法试验采用[CPU中文句法模型](https://raw.githubusercontent.com/explosion/spacy-models/master/meta/zh_core_web_sm-3.8.0.json)、来源原文词表与保守同音字候选。十句结构样例只验证关键词保留；完整词表规则在已见开发题上仅36/52正向、35/35拒绝，未采用为搜索后端。独立40题的五个漏召回分别涉及同音错字、准备过程表述、维修寄送表述、否定疑问句，以及标准问题的简短关键词。后续应分开验证输入规范化与条件判定，不能靠扩大拒绝范围换取表面安全。
+
+四类判定复用267-token固定提示缓存，每题验证公共缓存未被修改；三个合成样例的缓存与非缓存贪心输出一致。237.30ms为40题模型判定与条件核对的逐题耗时相加后p95，不含召回、进程间通信、数据库、并发或冷启动；缓存初始化约348.77ms、模型加载约681.50ms。推理仍仅在本机Metal验证，不代表Windows或Linux运行证据。
+
+初始留出结果已用于架构比较，之后不再属于未见数据。新增问句对在对应运行前冻结，但只验证条件判断，不等于完整API、规模、并发、Windows/Linux或真实业务验证。p95不含完整搜索链，MLX设备性能不能外推其他平台；4B模型权重约2.3GB；最初四类实验Metal峰值约2.65GB，新增缓存实验约2.84GB。
+
+本机证据目录：`/Users/hutou/Documents/customer-agent-synthetic/search-model-spike-2026-09-07`。聚合与结果绑定分别为 `experiment-summary.json`、`condition-evidence-hashes.json`、`instruct-evidence-hashes.json`、`candidate-policy-evidence-hashes.json`、`policy-normalization-evidence-hashes.json`；模型锁文件保存revision和每个文件的SHA256。原始FAIL报告保留；本PR仅提交上述合成聚合，远端读者不能仅凭此文复现全部实验。
 
 公开技术依据：[两阶段检索](https://www.sbert.net/examples/sentence_transformer/applications/retrieve_rerank/README.html)、[本地模型配置](https://huggingface.co/docs/transformers.js/main/custom_usage)、[Qwen重排模型](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B)、[Qwen指令模型](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507)。这些文档只支持技术路线说明，不证明本项目达标。
 
