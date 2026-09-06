@@ -57,12 +57,15 @@
 | BGE召回 + 双向NLI（原文），同28题 | 9/20 · 8/8 | 86.73ms | FAIL |
 | Qwen3-Reranker-0.6B条件判断，新增28问句对 | 15/15 · 3/13 | 52.41ms | FAIL |
 | Qwen3-4B-Instruct四类判断，新增24问句对 | 9/11 · 10/13 | 347.57ms | FAIL，单项超过现有300ms预算 |
+| 新展示规则：BGE相关性 + NLI矛盾检查 + 数量检查，新52题中的留出26题 | 14/16 · 9/10 | 187.58ms | FAIL，仍将更换锁芯召回为更换电池 |
 
-前三轮召回Top5均覆盖40/40合成正向目标，第一轮BGE重排也将40/40目标排在第一；困难在接受/拒绝判定。四类指令模型仍错误接受数量和运费承担方差异，不能直接接入。上述结果依据实验时的严格期望，用户随后确认展示规则，不追溯改分。
+前三轮召回Top5均覆盖40/40合成正向目标，第一轮BGE重排也将40/40目标排在第一；困难在接受/拒绝判定。四类指令模型仍错误接受数量和运费承担方差异，不能直接接入。前五轮结果依据实验时的严格期望，用户随后确认展示规则，不追溯改分。
+
+第六轮按新规则单独冻结8条合成知识、52题及脚本，再运行已有本地模型。开发26题为15/16正向、10/10拒绝，相关性阈值仅按开发集选择；留出26题为14/16、9/10。NLI错拒错字和带条件的相关问题，也漏掉操作对象冲突；数量检查只是按单位比较数字序列，不是通用语义解析。新数据、旧数据及报告分别保留，没有调整留出题或在结果后改阈值。热延迟为新52题整体p95，仍不含API、数据库及规模/并发验证。
 
 初始留出结果已用于架构比较，之后不再属于未见数据。新增问句对在对应运行前冻结，但只验证条件判断，不等于完整API、规模、并发、Windows/Linux或真实业务验证。p95不含完整搜索链，MLX设备性能不能外推其他平台；4B模型约2.3GB，Metal峰值约2.65GB。
 
-本机证据目录：`/Users/hutou/Documents/customer-agent-synthetic/search-model-spike-2026-09-07`。聚合与结果绑定分别为 `experiment-summary.json`、`condition-evidence-hashes.json`、`instruct-evidence-hashes.json`；模型锁文件保存revision和每个文件的SHA256。原始FAIL报告保留；本PR仅提交上述合成聚合，远端读者不能仅凭此文复现全部实验。
+本机证据目录：`/Users/hutou/Documents/customer-agent-synthetic/search-model-spike-2026-09-07`。聚合与结果绑定分别为 `experiment-summary.json`、`condition-evidence-hashes.json`、`instruct-evidence-hashes.json`、`candidate-policy-evidence-hashes.json`；模型锁文件保存revision和每个文件的SHA256。原始FAIL报告保留；本PR仅提交上述合成聚合，远端读者不能仅凭此文复现全部实验。
 
 公开技术依据：[两阶段检索](https://www.sbert.net/examples/sentence_transformer/applications/retrieve_rerank/README.html)、[本地模型配置](https://huggingface.co/docs/transformers.js/main/custom_usage)、[Qwen重排模型](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B)、[Qwen指令模型](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507)。这些文档只支持技术路线说明，不证明本项目达标。
 
