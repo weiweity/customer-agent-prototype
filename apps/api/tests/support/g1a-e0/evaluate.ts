@@ -8,86 +8,12 @@ import {
   type G1aStratum,
 } from './input-package.js';
 
-const POSITIVE_TOP3_MINIMUM = 14;
-const POSITIVE_STRATUM_MINIMUM_RATIO = 0.5;
-const SAFETY_NO_HIT_REQUIRED = 12;
-const LOCAL_P95_BUDGET_MS = 300;
-
-export type G1aEvaluationFailureCode =
-  | 'BACKEND_ERROR'
-  | 'EXPECTED_TOP3_MISS'
-  | 'EXPECTED_NO_HIT_MISS'
-  | 'FORBIDDEN_RETURNED'
-  | 'RELEASE_MISMATCH'
-  | 'SOURCE_BINDING_MISMATCH'
-  | 'CANDIDATE_PROVENANCE_INVALID'
-  | 'POSITIVE_THRESHOLD_MISSED'
-  | 'STRATUM_THRESHOLD_MISSED'
-  | 'SAFETY_THRESHOLD_MISSED'
-  | 'LOCAL_P95_BUDGET_MISSED'
-  | 'EVENT_WRITE_DETECTED'
-  | 'NETWORK_ATTEMPT_DETECTED';
-
-export type G1aEvaluationFailure = Readonly<{
-  case_id: string | null;
-  code: G1aEvaluationFailureCode;
-  actual_script_ids: readonly string[];
-  backend_code: string | null;
-  stratum_id: string | null;
-}>;
-
-export type G1aEvaluationReport = Readonly<{
-  schema: 'customer-agent/g1a-evaluation-report/v1';
-  status: 'NOT_SIGNED';
-  runner_result: 'EXECUTABLE' | 'FAILED';
-  decision: 'NOT_EVALUATED' | 'REVIEW_REQUIRED' | 'FAIL';
-  search_action_result: 'NOT_EVALUATED' | 'PASS_CANDIDATE' | 'REVIEW_REQUIRED' | 'FAIL';
-  business_accuracy_claim: 'NOT_EVALUATED' | 'CANDIDATE_ONLY';
-  downstream_action_evaluation: 'NOT_EVALUATED';
-  network_observation_scope: 'NODE_TCP_FETCH_GUARD_ONLY';
-  classification: G1aEvaluationPackage['manifest']['classification'];
-  eval_set_id: string;
-  manifest_sha256: string;
-  content_snapshot_id: string;
-  content_snapshot_sha256: string;
-  release_id: string;
-  source_binding_hash: string;
-  denominator: 50;
-  thresholds: Readonly<{
-    positive_top3_minimum: 14;
-    positive_stratum_minimum_ratio: 0.5;
-    safety_no_hit_required: 12;
-    source_correctness_ratio: 1;
-    forbidden_maximum: 0;
-    backend_error_maximum: 0;
-    event_write_maximum: 0;
-    process_guard_attempt_maximum: 0;
-    local_p95_budget_ms: 300;
-  }>;
-  strata: Readonly<Record<G1aStratum, Readonly<{
-    total: number;
-    search_action_correct: number;
-  }>>>;
-  positive_strata: readonly Readonly<{
-    stratum_id: string;
-    total: number;
-    hit_at_3: number;
-    ratio: number;
-  }>[];
-  raw: Readonly<{
-    positive_top3_hits: number;
-    safety_no_hits: number;
-    robustness_search_action_correct: number;
-    forbidden_violations: number;
-    source_correct: number;
-    source_checked: number;
-    backend_errors: number;
-    event_writes: number;
-    process_guard_attempts: number;
-    local_p95_ms: number;
-  }>;
-  failures: readonly G1aEvaluationFailure[];
-}>;
+import { G1A_THRESHOLDS, g1aReportOutcome, type G1aEvaluationFailureCode,
+  type G1aEvaluationFailure, type G1aEvaluationReport, type G1aCaseResult } from './report-contract.js';
+export type { G1aEvaluationFailureCode, G1aEvaluationFailure, G1aEvaluationReport } from './report-contract.js';
+const { positive_top3_minimum: POSITIVE_TOP3_MINIMUM,
+  positive_stratum_minimum_ratio: POSITIVE_STRATUM_MINIMUM_RATIO,
+  safety_no_hit_required: SAFETY_NO_HIT_REQUIRED, local_p95_budget_ms: LOCAL_P95_BUDGET_MS } = G1A_THRESHOLDS;
 
 type EvaluationEvidence = Readonly<{
   eventWrites: number;
@@ -184,6 +110,7 @@ export async function evaluateG1aPackage(
   evidence: EvaluationEvidenceSource,
 ): Promise<G1aEvaluationReport> {
   const failures: G1aEvaluationFailure[] = [];
+  const caseResults: G1aCaseResult[] = [];
   const totals: Record<G1aStratum, { total: number; correct: number }> = {
     positive: { total: 0, correct: 0 },
     safety_negative: { total: 0, correct: 0 },
@@ -201,6 +128,7 @@ export async function evaluateG1aPackage(
 
   for (const [index, testCase] of input.cases.entries()) {
     const expectation = input.expectations[index]!;
+    const failureOffset = failures.length;
     totals[testCase.stratum].total += 1;
     const stratumId = `${testCase.platform}:${testCase.core_intent_id}`;
     if (testCase.stratum === 'positive') {
@@ -210,7 +138,7 @@ export async function evaluateG1aPackage(
     }
 
     const startedAt = performance.now();
-    let result: Awaited<ReturnType<SearchBackend['search']>>;
+    let result: Awaited<ReturnType<SearchBackend['search']>> | null = null;
     try {
       result = await backend.search({
         normalizedQuery: testCase.query_text,
@@ -220,15 +148,26 @@ export async function evaluateG1aPackage(
         topK: 3,
       });
     } catch {
-      durations.push(performance.now() - startedAt);
-      backendErrors += 1;
-      failures.push(failure('BACKEND_ERROR', { case_id: testCase.case_id, backend_code: 'THREW' }));
-      continue;
+      // A thrown backend error shares the failed-query outcome; never retain its text.
     }
     durations.push(performance.now() - startedAt);
-    if (!result.ok) {
+    const caseIdentity = {
+      case_id: testCase.case_id,
+      stratum: testCase.stratum,
+      stratum_id: stratumId,
+      expected_search_action: expectation.expected_search_action,
+      expected_downstream_action: expectation.downstream_action,
+    };
+    if (result === null || !result.ok) {
       backendErrors += 1;
-      failures.push(failure('BACKEND_ERROR', { case_id: testCase.case_id, backend_code: result.code }));
+      failures.push(failure('BACKEND_ERROR', {
+        case_id: testCase.case_id, backend_code: result === null ? 'THREW' : result.code,
+      }));
+      caseResults.push(Object.freeze({
+        ...caseIdentity, outcome: 'backend_error', search_action_correct: false,
+        acceptable_candidate_returned: false, forbidden_candidate_returned: false,
+        candidates: Object.freeze([]), failure_codes: Object.freeze(['BACKEND_ERROR'] as const),
+      }));
       continue;
     }
 
@@ -239,14 +178,21 @@ export async function evaluateG1aPackage(
     if (result.sourceBindingHash !== input.manifest.source_binding_hash) {
       failures.push(failure('SOURCE_BINDING_MISMATCH', { case_id: testCase.case_id, actual_script_ids: actualIds }));
     }
+    const observedCandidates: G1aCaseResult['candidates'][number][] = [];
     for (const candidate of result.candidates) {
       sourceChecked += 1;
-      if (candidateIsCorrect(
+      const provenanceValid = candidateIsCorrect(
         testCase,
         contentById.get(candidate.script_id),
         candidate,
         input.manifest.release_id,
-      )) {
+      );
+      // Keep the immutable candidate identity needed for review, never the response body.
+      observedCandidates.push(Object.freeze({
+        rank: candidate.rank, script_id: candidate.script_id, script_version: candidate.script_version,
+        content_hash: candidate.content_hash, release_id: candidate.release_id, provenance_valid: provenanceValid,
+      }));
+      if (provenanceValid) {
         sourceCorrect += 1;
       } else {
         failures.push(failure('CANDIDATE_PROVENANCE_INVALID', {
@@ -267,7 +213,8 @@ export async function evaluateG1aPackage(
       positiveStrata.get(stratumId)!.hit += 1;
     }
     if (testCase.stratum === 'safety_negative' && actualIds.length === 0) safetyNoHits += 1;
-    if (isCaseCorrect(expectation, actualIds, forbiddenReturned)) {
+    const searchActionCorrect = isCaseCorrect(expectation, actualIds, forbiddenReturned);
+    if (searchActionCorrect) {
       totals[testCase.stratum].correct += 1;
     } else if (!forbiddenReturned) {
       failures.push(failure(
@@ -275,6 +222,15 @@ export async function evaluateG1aPackage(
         { case_id: testCase.case_id, actual_script_ids: actualIds },
       ));
     }
+    caseResults.push(Object.freeze({
+      ...caseIdentity,
+      outcome: actualIds.length === 0 ? 'no_hit' : 'hit',
+      acceptable_candidate_returned: hitAt3,
+      forbidden_candidate_returned: forbiddenReturned,
+      search_action_correct: searchActionCorrect,
+      candidates: Object.freeze(observedCandidates),
+      failure_codes: Object.freeze(failures.slice(failureOffset).map((item) => item.code)),
+    }));
   }
 
   const positiveStrataReport = Object.freeze([...positiveStrata.entries()]
@@ -298,33 +254,10 @@ export async function evaluateG1aPackage(
   const localP95Ms = percentile95(durations);
   if (localP95Ms >= LOCAL_P95_BUDGET_MS) failures.push(failure('LOCAL_P95_BUDGET_MISSED'));
 
-  const hardFailureCodes = new Set<G1aEvaluationFailureCode>([
-    'BACKEND_ERROR', 'FORBIDDEN_RETURNED', 'RELEASE_MISMATCH', 'SOURCE_BINDING_MISMATCH',
-    'CANDIDATE_PROVENANCE_INVALID', 'POSITIVE_THRESHOLD_MISSED', 'STRATUM_THRESHOLD_MISSED',
-    'SAFETY_THRESHOLD_MISSED', 'LOCAL_P95_BUDGET_MISSED', 'EVENT_WRITE_DETECTED',
-    'NETWORK_ATTEMPT_DETECTED',
-  ]);
-  const hardFailed = failures.some((entry) => hardFailureCodes.has(entry.code));
-  const robustnessNeedsReview = totals.robustness.correct !== totals.robustness.total;
-  const synthetic = input.manifest.classification === 'synthetic';
-  let decision: G1aEvaluationReport['decision'] = 'REVIEW_REQUIRED';
-  let searchActionResult: G1aEvaluationReport['search_action_result'] = 'PASS_CANDIDATE';
-  if (synthetic) {
-    decision = 'NOT_EVALUATED';
-    searchActionResult = 'NOT_EVALUATED';
-  } else if (hardFailed) {
-    decision = 'FAIL';
-    searchActionResult = 'FAIL';
-  } else if (robustnessNeedsReview) {
-    searchActionResult = 'REVIEW_REQUIRED';
-  }
   return Object.freeze({
     schema: 'customer-agent/g1a-evaluation-report/v1',
     status: 'NOT_SIGNED',
-    runner_result: hardFailed ? 'FAILED' : 'EXECUTABLE',
-    decision,
-    search_action_result: searchActionResult,
-    business_accuracy_claim: synthetic ? 'NOT_EVALUATED' : 'CANDIDATE_ONLY',
+    ...g1aReportOutcome(input.manifest.classification,failures,totals.robustness.correct),
     downstream_action_evaluation: 'NOT_EVALUATED',
     network_observation_scope: 'NODE_TCP_FETCH_GUARD_ONLY',
     classification: input.manifest.classification,
@@ -335,17 +268,7 @@ export async function evaluateG1aPackage(
     release_id: input.manifest.release_id,
     source_binding_hash: input.manifest.source_binding_hash,
     denominator: 50,
-    thresholds: Object.freeze({
-      positive_top3_minimum: 14,
-      positive_stratum_minimum_ratio: 0.5,
-      safety_no_hit_required: 12,
-      source_correctness_ratio: 1,
-      forbidden_maximum: 0,
-      backend_error_maximum: 0,
-      event_write_maximum: 0,
-      process_guard_attempt_maximum: 0,
-      local_p95_budget_ms: 300,
-    }),
+    thresholds: G1A_THRESHOLDS,
     strata: Object.freeze({
       positive: Object.freeze({
         total: totals.positive.total,
@@ -361,6 +284,7 @@ export async function evaluateG1aPackage(
       }),
     }),
     positive_strata: positiveStrataReport,
+    case_results: Object.freeze(caseResults),
     raw: Object.freeze({
       positive_top3_hits: positiveTop3Hits,
       safety_no_hits: safetyNoHits,
