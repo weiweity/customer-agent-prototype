@@ -12,6 +12,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Fixed
 
+- Made Windows packaging prepare Electron distribution and license inputs before building, removing its dependency on a previous application launch or smoke run.
 - Rejected contradictory release/provenance claims while preserving legitimate provenance failure reports.
 - Made G1a evaluation reports use one versioned, strictly validated delivery contract shared by the producer and reader, preserving complete reports for both successful and failed evaluations.
 - Required synthetic E0 CI to execute all PostgreSQL delivery cases without skips, including failure reporting and cleanup refusal.

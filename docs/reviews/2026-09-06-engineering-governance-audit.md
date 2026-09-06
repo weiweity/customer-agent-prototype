@@ -269,3 +269,12 @@ CI依赖/失败语义依据[GitHub工作流官方说明](https://docs.github.com
 修复后重新运行 lint、typecheck、test、build、E0 CI 均通过：常规734项，E0 84项（11项实际PG、0跳过）。实际产品 CLI 到v5消费者的三类合成链路再次3/3通过并清理，证据为受控证据根17目录的 `attempt-b1_wumcj/verification.json`（15.695秒）。此前732/82及15-synthetic、16-synthetic、17-synthetic旧记录仍是各自被测版本的历史证据。
 
 独立计划审查确认G1～G4本地实施完成，G5按证据保留现有hook；远端CI及平台实测由本PR后续核验。独立覆盖审查按30个行为组评估27/30（90%，不是实测行覆盖率），保留三组非阻断负向测试缺口：E0包装器错误分支、文档检查器坏输入、formal builder测试失败时保留既有候选。本轮不改桌面发布版本，工程与评测交付记入Unreleased。
+
+
+### Windows CI 暴露的初始化顺序修复
+
+PR #34 首轮 CI 的 Linux 与 PG15 通过，Windows 被许可文件后验拒绝，总门随之失败。日志明确显示 `node_modules/electron/dist/LICENSE` 和 `LICENSES.chromium.html` 不存在：Electron 43 的 npm 包改为首次加载时下载，而旧CI先运行smoke，隐式为打包提供了这两份输入。此次打包前移暴露出打包入口不能独立运行的顺序依赖。
+
+Windows打包入口现先调用已安装Electron包自带的安装器，使用原有CA环境；上游已安装检查负责幂等。准备失败在输出目录清理之前退出，且执行CA清理；许可后验继续生效。新增首次打包回归修复前1失败/9通过，修复后含五阶段失败矩阵11/11通过，独立定向代码审查通过。Windows实证以同PR后续头提交的CI为准，不用本地模拟代替；Mac打包入口未在此变更范围内。
+
+此修复后本地 lint、typecheck、736项常规测试和build重新通过。E0及v5代码/输入未变，复用84项E0与实际CLI三场景证据。
