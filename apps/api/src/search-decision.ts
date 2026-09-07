@@ -21,7 +21,7 @@ const FUNCTION_WORDS = Object.freeze([
   '怎么', '一下', '已经', '以后', '之后', '还会', '还是', '还能', '需要',
   '应该', '可以', '这款', '这个', '那个', '哪里', '时候', '提交', '申请',
   '影响', '内容', '完成', '归还', '检查', '兼容', '范围', '连接', '哪些',
-  '记录', '包装', '这句话', '请问', '您好',
+  '记录', '包装', '这句话', '这一句', '请问', '您好',
   '吗', '呢', '啊', '吧', '嘛', '的', '了', '还', '能', '在', '谁', '并',
   '后', '要', '才', '有', '是', '会', '到', '与', '和', '或', '由', '向', '给',
 ]);
@@ -29,7 +29,7 @@ const FUNCTION_WORDS = Object.freeze([
 const BOUNDED_POLITE = /^(你好|您好)(?=请问|怎么|怎样|如何|吗|呢|$)/u;
 
 const CONFIRMATION_TAG = /^(对吗|是吗|是不是|对不对|吗|呢)\??$/u;
-const SIDE_QUESTION = /(在哪里|哪里查|哪里看|包装在哪里|记录在哪里)/u;
+const SIDE_QUESTION = /(在哪里|哪里查|哪里看|包装在哪里|记录在哪里|保存在哪里)/u;
 
 const CN_NUM: Readonly<Record<string, number>> = Object.freeze({
   零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5,
@@ -161,7 +161,7 @@ type SpeechAct = 'confirmation' | 'assertion' | 'info_question' | 'quoted' | 'un
 function clauseAct(clause: string): SpeechAct {
   const normalized = normalizeSearchText(clause);
   const compact = compactSearchText(normalized);
-  if (/^["“].+[”"](这句话)?$/u.test(normalized) || /这句话$/u.test(normalized)) {
+  if (/^["“].+[”"](这句话|这一句)?$/u.test(normalized) || /(这句话|这一句)$/u.test(normalized)) {
     return 'quoted';
   }
   if (CONFIRMATION_TAG.test(normalized.replace(/[?？]/gu, ''))) return 'confirmation';
@@ -256,6 +256,7 @@ type DirectedFact = Readonly<{ from: string; to: string; verb: string }>;
 type QuantityFact = Readonly<{ buy: number; give: number }>;
 type PolarFact = Readonly<{ polarity: 'pos' | 'neg'; predicate: string }>;
 type TimeFact = Readonly<{ window: 'before_start' | 'after_start'; allowed: boolean }>;
+type DurationFact = Readonly<{ amount: number; unit: 's' }>;
 
 function stripClauseNoise(text: string): string {
   return normalizeSearchText(text)
@@ -264,19 +265,51 @@ function stripClauseNoise(text: string): string {
     .trim();
 }
 
+const ROLE_SUFFIX_SHORT = '台客店';
+const ROLE_SUFFIX_LONG = '方人者家员商';
+const ROLE_FORBIDDEN_START = '向给后并的了与和';
+
+function extractRoles(haystack: string): ReadonlyArray<Readonly<{ value: string; start: number; end: number }>> {
+  const chars = Array.from(haystack);
+  const roles: Array<Readonly<{ value: string; start: number; end: number }>> = [];
+  for (let index = 0; index < chars.length; index += 1) {
+    const suffix = chars[index];
+    if (suffix === undefined) continue;
+    const preferShort = ROLE_SUFFIX_SHORT.includes(suffix);
+    const preferLong = ROLE_SUFFIX_LONG.includes(suffix);
+    if (!preferShort && !preferLong) continue;
+    const two = index >= 1 ? `${chars[index - 1] ?? ''}${suffix}` : '';
+    const three = index >= 2 ? `${chars[index - 2] ?? ''}${chars[index - 1] ?? ''}${suffix}` : '';
+    const take = (value: string, start: number): void => {
+      if (value.length < 2 || ROLE_FORBIDDEN_START.includes(value[0] ?? '')) return;
+      roles.push(Object.freeze({ value, start, end: index + 1 }));
+    };
+    if (preferShort) {
+      if (two.length === 2) take(two, index - 1);
+      else if (three.length === 3) take(three, index - 2);
+    } else if (three.length === 3) {
+      take(three, index - 2);
+    } else if (two.length === 2) {
+      take(two, index - 1);
+    }
+  }
+  return Object.freeze(roles);
+}
+
 function extractDirected(text: string): readonly DirectedFact[] {
   const facts: DirectedFact[] = [];
-  for (const clause of splitClauses(text)) {
-    const haystack = stripClauseNoise(clause);
-    const pattern = /([\p{L}\p{N}]{1,2}[方人店者家员商])(?:需要|应|要)?(?:向|给)([\p{L}\p{N}]{1,2}[方人店者家员商])/gu;
-    for (const match of haystack.matchAll(pattern)) {
-      const from = match[1];
-      const to = match[2];
-      if (from === undefined || to === undefined || match.index === undefined) continue;
-      const verb = compactSearchText(haystack.slice(match.index + match[0].length)).slice(0, 8);
-      if (verb.length < 2) continue;
-      facts.push(Object.freeze({ from, to, verb }));
-    }
+  const haystack = compactSearchText(stripClauseNoise(text));
+  const roles = extractRoles(haystack);
+  const transferPattern = /(?:向|给)([\p{L}\p{N}]{1,2}[方人店者家员商台客])/gu;
+  for (const match of haystack.matchAll(transferPattern)) {
+    const to = match[1];
+    if (to === undefined || match.index === undefined) continue;
+    const from = [...roles].reverse().find((role) => role.end <= match.index);
+    if (from === undefined) continue;
+    const verbStart = match.index + match[0].length;
+    const verb = haystack.slice(verbStart, verbStart + 8);
+    if (verb.length < 2) continue;
+    facts.push(Object.freeze({ from: from.value, to, verb }));
   }
   return Object.freeze(facts);
 }
@@ -284,7 +317,7 @@ function extractDirected(text: string): readonly DirectedFact[] {
 function extractQuantities(text: string): readonly QuantityFact[] {
   const facts: QuantityFact[] = [];
   const compact = compactSearchText(text);
-  const pattern = /(?:买|购买)([一二三四五六七八九十两\d]+)[块件个].*?(?:赠送|送)([一二三四五六七八九十两\d]+)/gu;
+  const pattern = /(?:买|购买)([一二三四五六七八九十两\d]+)[块件个盒].*?(?:赠送|送)([一二三四五六七八九十两\d]+)/gu;
   for (const match of compact.matchAll(pattern)) {
     const buy = parseNumberToken(match[1] ?? '');
     const give = parseNumberToken(match[2] ?? '');
@@ -313,9 +346,17 @@ function extractPolar(text: string): readonly PolarFact[] {
     if (compact.slice(Math.max(0, index - 1), index) === '不') continue;
     push('pos', match[1]);
   }
+  for (const match of compact.matchAll(/不会(?:删除|清除)([\p{L}\p{N}和]{2,30})/gu)) {
+    for (const part of (match[1] ?? '').split('和')) push('pos', part);
+  }
+  for (const match of compact.matchAll(/([\p{L}\p{N}]{2,12})会被(?:删除|清除)/gu)) push('neg', match[1]);
   for (const match of compact.matchAll(/(?:会)?(?:删除|清除)([\p{L}\p{N}和]{2,30})/gu)) {
+    const index = match.index ?? 0;
+    if (compact.slice(Math.max(0, index - 2), index).includes('不')) continue;
     for (const part of (match[1] ?? '').split('和')) push('neg', part);
   }
+  for (const match of compact.matchAll(/免费([\p{L}\p{N}]{2,12})/gu)) push('pos', match[1]);
+  for (const match of compact.matchAll(/(?:须)?付费([\p{L}\p{N}]{2,12})/gu)) push('neg', match[1]);
   for (const match of compact.matchAll(/([\p{L}\p{N}]{2,12})还会保留/gu)) push('pos', match[1]);
   for (const match of compact.matchAll(/保留([\p{L}\p{N}]{2,20})/gu)) push('pos', match[1]);
   for (const match of compact.matchAll(/([\p{L}\p{N}]{2,12})保留/gu)) {
@@ -335,14 +376,29 @@ function extractPolar(text: string): readonly PolarFact[] {
 function extractTime(text: string): readonly TimeFact[] {
   const compact = compactSearchText(stripClauseNoise(text));
   const facts: TimeFact[] = [];
-  if (/开始前/u.test(compact) && /可以|申请取消/u.test(compact)) {
+  if (/(?:开始|入场|核销)前/u.test(compact) && /可以|申请/u.test(compact)) {
     facts.push(Object.freeze({ window: 'before_start' as const, allowed: true }));
   }
-  if (/(?:已经)?开始后/u.test(compact) || /开始之后/u.test(compact)) {
-    const allowed = /可以|还能/u.test(compact) && !/不接受|不能|不[能可]/u.test(compact);
+  if (
+    /(?:已经)?(?:开始|入场|核销)后/u.test(compact)
+    || /(?:开始|入场)之后/u.test(compact)
+    || /核销入场后/u.test(compact)
+  ) {
     const denied = /不接受|不能|不[能可]/u.test(compact);
+    const allowed = /可以|还能/u.test(compact) && !denied;
     if (denied) facts.push(Object.freeze({ window: 'after_start' as const, allowed: false }));
     else if (allowed) facts.push(Object.freeze({ window: 'after_start' as const, allowed: true }));
+  }
+  return Object.freeze(facts);
+}
+
+function extractDurations(text: string): readonly DurationFact[] {
+  const facts: DurationFact[] = [];
+  const compact = compactSearchText(text);
+  for (const match of compact.matchAll(/([一二三四五六七八九十两\d]+)秒/gu)) {
+    const amount = parseNumberToken(match[1] ?? '');
+    if (amount === null) continue;
+    facts.push(Object.freeze({ amount, unit: 's' as const }));
   }
   return Object.freeze(facts);
 }
@@ -405,6 +461,13 @@ function timeConflict(queryFacts: readonly TimeFact[], sourceFacts: readonly Tim
     }
   }
   return false;
+}
+
+function durationConflict(queryFacts: readonly DurationFact[], sourceFacts: readonly DurationFact[]): boolean {
+  if (queryFacts.length === 0 || sourceFacts.length === 0) return false;
+  return queryFacts.some((query) => sourceFacts.some((source) => (
+    query.unit === source.unit && query.amount !== source.amount
+  )));
 }
 
 function operationMismatch(queryOps: readonly string[], sourceOps: readonly string[], sourceCompact: string): boolean {
@@ -522,6 +585,7 @@ function factsOf(text: string): Readonly<{
   quantity: readonly QuantityFact[];
   polar: readonly PolarFact[];
   time: readonly TimeFact[];
+  duration: readonly DurationFact[];
   operations: readonly string[];
 }> {
   return Object.freeze({
@@ -529,6 +593,7 @@ function factsOf(text: string): Readonly<{
     quantity: extractQuantities(text),
     polar: extractPolar(text),
     time: extractTime(text),
+    duration: extractDurations(text),
     operations: extractOperations(text),
   });
 }
@@ -536,7 +601,7 @@ function factsOf(text: string): Readonly<{
 const QUERY_CONDITION_MARKERS = Object.freeze(['前', '全', '必须', '无条件', '绝对', '保证']);
 
 function extraQueryCondition(queryCompact: string, sourceCompact: string): boolean {
-  if (/开始前|开始后|已经开始/u.test(queryCompact)) return false;
+  if (/(?:开始|入场|核销)前|(?:开始|入场|核销)后|已经开始/u.test(queryCompact)) return false;
   return QUERY_CONDITION_MARKERS.some((marker) => (
     queryCompact.includes(marker) && !sourceCompact.includes(marker)
   ));
@@ -630,10 +695,15 @@ function sharedNounPrefixMismatch(queryCompact: string, sourceTitle: string): bo
       const noun = sourceTitle.slice(index, index + nounLen);
       const queryIndex = queryCompact.indexOf(noun);
       if (queryIndex < 2 || index < 2) continue;
-      const queryPrefix = queryCompact.slice(queryIndex - 2, queryIndex);
-      const sourcePrefix = sourceTitle.slice(index - 2, index);
-      if (queryPrefix === sourcePrefix || hamming1(queryPrefix, sourcePrefix)) continue;
-      if (isWeakGram(queryPrefix) || isWeakGram(sourcePrefix)) continue;
+      const queryPrefix = queryCompact.slice(Math.max(0, queryIndex - 3), queryIndex);
+      const sourcePrefix = sourceTitle.slice(Math.max(0, index - 3), index);
+      if (queryPrefix.length < 2 || sourcePrefix.length < 2) continue;
+      const queryTail = queryPrefix.slice(-3);
+      const sourceTail = sourcePrefix.slice(-3);
+      const queryPair = queryTail.slice(-2);
+      const sourcePair = sourceTail.slice(-2);
+      if (queryTail === sourceTail || queryPair === sourcePair || hamming1(queryPair, sourcePair)) continue;
+      if (isWeakGram(queryTail) || isWeakGram(sourceTail) || isWeakGram(queryPair) || isWeakGram(sourcePair)) continue;
       return true;
     }
   }
@@ -656,6 +726,7 @@ function candidateConflict(
   const qty = quantityConflict(queryFacts.quantity, sourceFacts.quantity);
   const polar = polarConflict(queryFacts.polar, sourceFacts.polar);
   const time = timeConflict(queryFacts.time, sourceFacts.time);
+  const duration = durationConflict(queryFacts.duration, sourceFacts.duration);
   const ops = operationMismatch(queryFacts.operations, sourceFacts.operations, sourceCompact);
   const missing = askedObjectMissing(queryText, sourceCompact);
   const product = productSubjectMismatch(queryText, candidate);
@@ -671,7 +742,7 @@ function candidateConflict(
     return true;
   }
   if (intent.act === 'assertion' || intent.hasConflictingAssertionShape) {
-    return inverted || qty || polar || time;
+    return inverted || qty || polar || time || duration;
   }
   return false;
 }

@@ -29,6 +29,41 @@ describe('search decision', () => {
     expect(result.shownScriptIds).toEqual([]);
   });
 
+  it('rejects inverted desk/visitor deposit roles while showing the confirmation', () => {
+    const badge = candidate(
+      'badge',
+      '借用证押金退还流程',
+      '借用证押金退还流程',
+      '访客离馆时将借用证交回前台；前台收到借用证并核对后，向访客退还押金。',
+    );
+    expect(judgeSearch('借用证交回核对完成后，访客向前台退还押金', [badge]).decision).toBe('reject');
+    expect(judgeSearch('借用证交回核对完成后，是访客向前台退还押金吗', [badge])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['badge'],
+    });
+  });
+
+  it('rejects a box-quantity assertion that inverts the gift rule', () => {
+    const notes = candidate(
+      'notes',
+      '便签赠送活动',
+      '便签赠送活动',
+      '购买五盒便签赠送两盒同款便签。赠品不能兑换现金。',
+    );
+    expect(judgeSearch('便签购买两盒赠送五盒', [notes]).decision).toBe('reject');
+    expect(judgeSearch('便签活动是买两盒送五盒，对不对', [notes]).decision).toBe('show');
+  });
+
+  it('treats a quoted fragment as clarify, not as an assertion', () => {
+    const badge = candidate(
+      'badge',
+      '借用证押金退还流程',
+      '借用证押金退还流程',
+      '访客离馆时将借用证交回前台；前台收到借用证并核对后，向访客退还押金。',
+    );
+    expect(judgeSearch('“访客给前台退押金”这一句', [badge]).decision).toBe('clarify_or_no_result');
+  });
+
   it('keeps an assertion of inverted invoice roles rejected', () => {
     const invoice = candidate(
       'invoice',
