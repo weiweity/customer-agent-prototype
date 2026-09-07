@@ -219,6 +219,22 @@ describe('search decision', () => {
     expect(judgeSearch('请问恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
     expect(judgeSearch('这个恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
     expect(judgeSearch('恒温杯出厂温度是多少', [kettle]).shownScriptIds).toEqual([]);
+    const kettleName = candidate(
+      'kettle-name',
+      '恒温壶',
+      '恒温壶',
+      '恒温壶出厂默认七十五度。',
+    );
+    expect(judgeSearch('请问恒温杯出厂温度', [kettleName]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('这个恒温杯出厂温度', [kettleName]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('恒温杯出厂温度是多少', [kettleName]).shownScriptIds).toEqual([]);
+    const poleName = candidate(
+      'pole-name',
+      '登山杖',
+      '登山杖',
+      '登山杖中管旋钮顺时针锁紧。',
+    );
+    expect(judgeSearch('登高杖锁紧方向', [poleName]).shownScriptIds).toEqual([]);
   });
 
   it('keeps an assertion of inverted invoice roles rejected', () => {

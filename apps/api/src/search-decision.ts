@@ -815,15 +815,19 @@ function substitutedObjectToken(queryCompact: string, sourceTitle: string): bool
   const queryChars = Array.from(queryCompact);
   const sourceChars = Array.from(sourceTitle);
   for (const objectLength of [3, 2]) {
-    if (sourceChars.length < objectLength + 2) continue;
+    if (sourceChars.length < objectLength) continue;
     const object = sourceChars.slice(0, objectLength).join('');
     const tail = sourceChars.slice(objectLength).join('');
-    if (tail.length < 2) continue;
     for (let start = 0; start + objectLength <= queryChars.length; start += 1) {
       const span = queryChars.slice(start, start + objectLength).join('');
       if (span === object) continue;
       if (!hamming1(span, object) || isUnsafeTypoPair(span, object)) continue;
       const after = queryChars.slice(start + objectLength).join('');
+      if (tail.length === 0) {
+        if (objectLength >= 3) return true;
+        continue;
+      }
+      if (tail.length < 2) continue;
       if (after.startsWith(tail)) return true;
     }
   }
