@@ -903,7 +903,7 @@ export function judgeSearch(
   }
 
   const originalCompact = compactSearchText(rawQuery);
-  if (originalCompact.length < 3) {
+  if (originalCompact.length > 0 && originalCompact.length < 3) {
     const exact = candidates.some((candidate) => (
       isExactQuestion(normalized, candidate) || isExactTitle(normalized, candidate)
     ));

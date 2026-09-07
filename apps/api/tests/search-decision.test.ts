@@ -103,6 +103,19 @@ describe('search decision', () => {
     expect(judgeSearch('天气怎么样发票开具责任吗', pool).shownScriptIds).toEqual([]);
     expect(judgeSearch('押金天气预报共享雨伞押金退回', pool).shownScriptIds).toEqual([]);
     expect(judgeSearch('发票', pool).decision).toBe('clarify_or_no_result');
+    const wildcard = candidate('wildcard', '含%通配_和\\字面', '含%通配_和\\字面', '含%通配_和\\字面');
+    expect(judgeSearch('%', [wildcard])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['wildcard'],
+    });
+    expect(judgeSearch('_', [wildcard])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['wildcard'],
+    });
+    expect(judgeSearch('\\', [wildcard])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['wildcard'],
+    });
     expect(judgeSearch('能保证预约开始后也可以取消吗', pool).shownScriptIds).toEqual([]);
     expect(judgeSearch('预约开始后也可以取消吗', pool)).toMatchObject({
       decision: 'show',
