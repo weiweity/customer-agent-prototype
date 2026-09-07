@@ -2,7 +2,7 @@
 
 > **状态：APPROVED · EXECUTION MANAGEMENT ONLY**
 > 执行方法统一使用[工程工作流程](../reference-engineering-workflow.md)。本文件只维护完整目标、当前执行清单与历史事实，不新增真实运行、签发、合并或发布授权。
-> **当前分类：PR #29～#38 已合并。搜索候选 [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) 已 squash 合入，当前 main 为 `a00ba1edeb824dc8695f982c3128cb7cd7b36139`（含 #37 `61afa36` 与文档 #38）。owner-t5-005 已单次执行，结果 FAILED_NOT_SIGNED（正例 20/20，稳健性 16/18，安全负例 7/12）。不是真实验收通过。T6、正式接入和可试装真实安装包尚未完成。**
+> **当前分类：PR #29～#40 已合并。搜索候选 [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) 已 squash 合入；leftover 修复 [PR #40](https://github.com/weiweity/customer-agent-prototype/pull/40) 已 squash 合入 `main@df675768786b0b0a7e4e8438f824921f9642d7ac`（头 `0453bf863c5e1a9d375ac43118b3673aeaf996d5`）。owner-t5-005 已单次执行，结果 FAILED_NOT_SIGNED（正例 20/20，稳健性 16/18，安全负例 7/12），绑定当时 main `a00ba1e`，不是 leftover 后的 `df67576`。不是真实验收通过。T6、正式接入和可试装真实安装包尚未完成。**
 
 ## 可粘贴到应用的目标
 
@@ -20,7 +20,7 @@
 
 ## 当前执行清单
 
-> 核对日期：2026-09-07。以下为唯一恢复执行入口；后面的历史记录仅用于追溯。已完成的合并、清理、004执行和负责人确认不再重复请求。应用目标状态不替代此处的事实或正式批准。
+> 核对日期：2026-09-07。以下为唯一恢复执行入口；后面的历史记录仅用于追溯。已完成的合并（含 #37/#38/#40）、清理、004/005 执行和负责人确认不再重复请求。应用目标状态不替代此处的事实或正式批准。
 
 ### 已完成
 
@@ -35,16 +35,19 @@
 | 004逐题失败与复核交接 | 15个未达预期项均为no-hit；稳健性通过的4项是预期澄清/无结果，14个稳健性正向目标均未召回。独立业务/QA复核人已由用户明确，身份和完整交接保留仓外；尚未取得事后复核意见或T6签发 |
 | 候选展示规则与确认问句冻结 | [PR #35](https://github.com/weiweity/customer-agent-prototype/pull/35) 与 [PR #36](https://github.com/weiweity/customer-agent-prototype/pull/36) 已合并到 `main@c61834ba8b45f6009d6239a7ff6c1998fb4ec793`。规则真源为[自然语言搜索计划](2026-09-07-natural-language-search.md)；48 题冻结对照为 `docs/acceptance/search-confirmation-v1.json`，哈希 `49a775f0664ab60fe9be540cf818faa66a850e7eec62adbfa746f6077ab17da8` |
 | 单轮本地训练及评估 | 用户明确回复“训练”后执行300步，105.92秒结束；基础权重/输入未变。新40题由训练前20/20正向、3/20拒绝变为19/20、9/20，仍FAIL_NOT_ADOPTED；实际训练与评估证据见搜索研究，不属于已交付算法 |
-| 搜索候选（门禁池 + 判定） | [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) 已 squash 合并为 `61afa36d3abc782453710bdd6acef79df3bbf444`；文档 [PR #38](https://github.com/weiweity/customer-agent-prototype/pull/38) 已 squash 为 `a00ba1edeb824dc8695f982c3128cb7cd7b36139`（当前 origin/main）。冻结 48 题 48/48；合成 G1a 50/50；合入 main 不是一期完成 |
-| owner-t5-005 单次真实离线复验 | 用户批准后执行一次，v5 操作器，产品 `a00ba1e`，清理 PASS，未超时。正例 20/20，稳健性 16/18，安全负例 7/12，来源 42/42，forbidden 1，backend/事件/守卫 0，p95 47.62ms。操作器 `FAILED_NOT_SIGNED`，报告决策 FAIL / CANDIDATE_ONLY，下游 NOT_EVALUATED，T6 未签。未重试、未续期、未部署。不能把 004 的 12/12 安全分或 005 的正例提升写成验收通过 |
+| 搜索候选（门禁池 + 判定） | [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) 已 squash 合并为 `61afa36d3abc782453710bdd6acef79df3bbf444`；文档 [PR #38](https://github.com/weiweity/customer-agent-prototype/pull/38) 已 squash 为 `a00ba1edeb824dc8695f982c3128cb7cd7b36139`。冻结 48 题 48/48；合成 G1a 50/50；合入 main 不是一期完成 |
+| leftover 范围检查 | [PR #40](https://github.com/weiweity/customer-agent-prototype/pull/40) 已 squash 合并为 `df675768786b0b0a7e4e8438f824921f9642d7ac`（头 `0453bf863c5e1a9d375ac43118b3673aeaf996d5`，当前 origin/main）。只改 `search-decision` 的 leftover 与无歧义错字；合并后 main CI [run 34097347440](https://github.com/weiweity/customer-agent-prototype/actions/runs/34097347440) SUCCESS。合成绿不是 005 已修好，也不是 T6 |
+| owner-t5-005 单次真实离线复验 | 用户批准后执行一次，v5 操作器，产品 `a00ba1e`，清理 PASS，未超时。正例 20/20，稳健性 16/18，安全负例 7/12，来源 42/42，forbidden 1，backend/事件/守卫 0，p95 47.62ms。操作器 `FAILED_NOT_SIGNED`，报告决策 FAIL / CANDIDATE_ONLY，下游 NOT_EVALUATED，T6 未签。未重试、未续期、未部署。不能把 004 的 12/12 安全分、005 的正例提升或 #40 合入写成验收通过 |
 
 ### 可执行与下一动作
 
 用户已经明确批准004并要求同范围后续工作持续执行；不再把004写成待授权或把复核人写成未知。已获批阶段的实现、必要验证、文档及commit / push / PR授权持续有效；新的范围、合并、签发、真实运行和发布仍按对应授权核对。
 
-当前可执行：无新的真实运行。`owner-t5-005` 授权已使用，不得重试或换配置再跑同一包。不要续期旧包、不要部署或发布、不要代签 T6。不要重复请求 004/005 运行、复核人身份或 #35/#36/#37/#38 合并。
+当前可执行：无新的真实运行。`owner-t5-005` 授权已使用，不得重试或换配置再跑同一包。004/005 所用包到期北京时间 2026-09-07 14:14:02，现已过期，不得自动续期。不要部署或发布、不要代签 T6。不要重复请求 004/005 运行、复核人身份或 #35/#36/#37/#38/#40 合并。本文件随 #39 更新后仍待单独合并批准。
 
-安全负例从 004 的 12/12 降到 7/12（含 1 次 forbidden），是本候选进入真实验收前必须由独立业务/QA 处置的失败。不得用 005 逐题调参后再称独立验证。
+leftover 修复已合入 `df67576`，不能写成 005 安全失败已关闭。新的真实离线复验需要新包、新 `run_id`，并绑定 `df67576`；未获该次授权不得执行。不得用 005 逐题调参后再称独立验证。
+
+安全负例从 004 的 12/12 降到 7/12（含 1 次 forbidden），是本候选进入真实验收前必须由独立业务/QA 处置的失败。
 
 角色后缀（台/客）、量词单位（盒）、入场/核销时间窗、免费/付费与不会删除极性、秒级时长、以及「这一句」引述已作为一般判定补强写入搜索模块，48 题与 G1a 合成仍须通过。仓外 55 题仍是已见数据，不得再跑后称为独立验证。
 
@@ -52,7 +55,8 @@
 
 | 待办 | 所缺内容 | 仅阻塞的动作 |
 | --- | --- | --- |
-| 独立业务/QA事后复核 | 复核人已明确；现需对 005 的安全负例 7/12 与 forbidden 1 给出实际意见及失败处置 | 业务/QA签收及其后的T6决定；不能由实现者代审，也不能用 004 或合成分数代签 |
+| 独立业务/QA事后复核 | 复核人已明确；现需对 005 的安全负例 7/12 与 forbidden 1 给出实际意见及失败处置 | 业务/QA签收及其后的T6决定；不能由实现者代审，也不能用 004、合成或 #40 合入代签 |
+| leftover 后的真实离线复验 | 需新包、单次 `run_id` 授权，绑定 `df67576`；先核验有效期、权限、manifest 锚点和清理条件。旧包已过期，不得自动续期，也不得重跑 005 | 新的真实评测；不能把 004/005 分数或 leftover 合成绿当作本 SHA 的真实验收 |
 
 ### 依赖未满足
 
