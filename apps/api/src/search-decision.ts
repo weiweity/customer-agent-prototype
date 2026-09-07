@@ -814,15 +814,20 @@ function siblingVariantMismatch(
 function substitutedObjectToken(queryCompact: string, sourceTitle: string): boolean {
   const queryChars = Array.from(queryCompact);
   const sourceChars = Array.from(sourceTitle);
-  let index = 0;
-  while (index < queryChars.length && index < sourceChars.length && queryChars[index] === sourceChars[index]) {
-    index += 1;
+  for (const objectLength of [3, 2]) {
+    if (sourceChars.length < objectLength + 2) continue;
+    const object = sourceChars.slice(0, objectLength).join('');
+    const tail = sourceChars.slice(objectLength).join('');
+    if (tail.length < 2) continue;
+    for (let start = 0; start + objectLength <= queryChars.length; start += 1) {
+      const span = queryChars.slice(start, start + objectLength).join('');
+      if (span === object) continue;
+      if (!hamming1(span, object) || isUnsafeTypoPair(span, object)) continue;
+      const after = queryChars.slice(start + objectLength).join('');
+      if (after.startsWith(tail)) return true;
+    }
   }
-  if (index !== 2 || index >= queryChars.length || index >= sourceChars.length) return false;
-  if (queryChars[index] === sourceChars[index]) return false;
-  const queryRest = queryChars.slice(index + 1).join('');
-  const sourceRest = sourceChars.slice(index + 1).join('');
-  return queryRest.length >= 2 && sourceRest.startsWith(queryRest);
+  return false;
 }
 
 function sharedNounPrefixMismatch(queryCompact: string, sourceTitle: string): boolean {
@@ -1001,7 +1006,10 @@ export function judgeSearch(
   const distinctive = distinctiveGrams(candidates);
 
   const verdicts: CandidateVerdict[] = candidates.map((candidate) => {
-    const repairedCompact = repairUnambiguousTypos(originalCompact, repairVocabulary([candidate]));
+    const titleCompact = compactSearchText(candidate.title);
+    const repairedCompact = substitutedObjectToken(originalCompact, titleCompact)
+      ? originalCompact
+      : repairUnambiguousTypos(originalCompact, repairVocabulary([candidate]));
     const repairedNormalized = repairedCompact.length > 0 ? repairedCompact : normalized;
     const sourceCompact = matchCorpus(candidate);
     const overlap = overlapScore(repairedCompact, sourceCompact);

@@ -205,6 +205,7 @@ describe('search decision', () => {
       '登山杖中管旋钮顺时针锁紧；逆时针松开后可调节长度。锁紧后承重不超过使用者体重。',
     );
     expect(judgeSearch('滑雪杖中管旋钮怎么锁紧', [pole]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('登高杖锁紧方向', [pole]).shownScriptIds).toEqual([]);
   });
 
   it('does not map a unique Hamming-1 onto a different object with the same template tail', () => {
@@ -215,6 +216,9 @@ describe('search decision', () => {
       '恒温壶出厂默认七十五度。',
     );
     expect(judgeSearch('恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('请问恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('这个恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('恒温杯出厂温度是多少', [kettle]).shownScriptIds).toEqual([]);
   });
 
   it('keeps an assertion of inverted invoice roles rejected', () => {
