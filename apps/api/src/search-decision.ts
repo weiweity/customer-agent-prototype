@@ -823,8 +823,10 @@ function substitutedObjectToken(queryCompact: string, sourceTitle: string): bool
       if (span === object) continue;
       if (!hamming1(span, object) || isUnsafeTypoPair(span, object)) continue;
       const after = queryChars.slice(start + objectLength).join('');
-      if (tail.length === 0) {
-        if (objectLength >= 3) return true;
+      if (objectLength >= 3) {
+        if (tail.length === 0) return true;
+        if (after.startsWith(tail)) return true;
+        if (after.length >= 2 && tail.startsWith(after)) return true;
         continue;
       }
       if (tail.length < 2) continue;

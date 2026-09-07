@@ -2,7 +2,7 @@
 
 > **状态：APPROVED · EXECUTION MANAGEMENT ONLY**
 > 执行方法统一使用[工程工作流程](../reference-engineering-workflow.md)。本文件只维护完整目标、当前执行清单与历史事实，不新增真实运行、签发、合并或发布授权。
-> **当前分类：PR #29～#40 已合并。搜索候选 [PR #37](https://github.com/weiweity/customer-agent-prototype/pull/37) 已 squash 合入；leftover 修复 [PR #40](https://github.com/weiweity/customer-agent-prototype/pull/40) 已 squash 为 `df675768786b0b0a7e4e8438f824921f9642d7ac`。文档 [PR #39](https://github.com/weiweity/customer-agent-prototype/pull/39) 已 squash 合入当前 `main@95ca1b0c17c5b9526ecd07608f87b2d676fe529a`（main CI [34103742975](https://github.com/weiweity/customer-agent-prototype/actions/runs/34103742975) SUCCESS，文档范围）。owner-t5-005 已单次执行，结果 FAILED_NOT_SIGNED（正例 20/20，稳健性 16/18，安全负例 7/12），绑定当时 main `a00ba1e`，不是 leftover 后的 `df67576`/`95ca1b0`。不是真实验收通过。T6、正式接入和可试装真实安装包尚未完成。**
+> **当前分类：PR #29～#40 已合并。origin/main 仍为 `95ca1b0c17c5b9526ecd07608f87b2d676fe529a`（#40 leftover 代码 + #39 文档）。[PR #41](https://github.com/weiweity/customer-agent-prototype/pull/41) 仍 OPEN，含 leftover 保护、对象 Hamming-1 与 search-unseen-v2；合并不等于验收。owner-t5-005 已单次执行，结果 FAILED_NOT_SIGNED（正例 20/20，稳健性 16/18，安全负例 7/12），绑定当时 main `a00ba1e`，不是 leftover/#41 后的 SHA。不是真实验收通过。T6、正式接入和可试装真实安装包尚未完成。**
 
 ## 可粘贴到应用的目标
 
@@ -43,9 +43,9 @@
 
 用户已经明确批准004并要求同范围后续工作持续执行；不再把004写成待授权或把复核人写成未知。已获批阶段的实现、必要验证、文档及commit / push / PR授权持续有效；新的范围、合并、签发、真实运行和发布仍按对应授权核对。
 
-当前可执行：核验 leftover 在 `95ca1b0`（代码同 `df67576`）上的机制效果并补通用回归；无新的真实运行。`owner-t5-005` 授权已使用，不得重试或换配置再跑同一包。004/005 所用包到期北京时间 2026-09-07 14:14:02，现已过期，不得自动续期。不要部署或发布、不要代签 T6。不要重复请求 004/005 运行、复核人身份或 #35/#36/#37/#38/#39/#40 合并。
+当前可执行：#41 审查与未见合成已收口，等待该 PR 的明确合并批准；无新的真实运行。`owner-t5-005` 授权已使用，不得重试或换配置再跑同一包。004/005 所用包到期北京时间 2026-09-07 14:14:02，现已过期，不得自动续期。不要部署或发布、不要代签 T6。不要重复请求 004/005 运行、复核人身份或 #35/#36/#37/#38/#39/#40 合并。
 
-leftover 修复已合入 `df67576`，当前 main 为文档叠加后的 `95ca1b0`，不能写成 005 安全失败已关闭。新的真实离线复验需要新包、新 `run_id`，并绑定拟测 SHA（现为 `95ca1b0`）；未获该次授权不得执行。不得用 005 逐题调参后再称独立验证。
+leftover-unseen-v1（25 题）首次 20/25，修通用机制后 25/25，已见。search-unseen-v2（30 题，新主题）冻结后首次 29/30：`树脂瓦` 三字 SHOW、冻结期望为 clarify；未改期望、未降低不足语境门槛。合成绿不能写成 005 安全失败已关闭。新的真实离线复验需要新包、新 `run_id`，并绑定拟测 SHA（若先合 #41 则为合并后 origin/main）；未获该次授权不得执行。不得用 005 逐题调参后再称独立验证。
 
 安全负例从 004 的 12/12 降到 7/12（含 1 次 forbidden），是本候选进入真实验收前必须由独立业务/QA 处置的失败。
 
@@ -56,7 +56,8 @@ leftover 修复已合入 `df67576`，当前 main 为文档叠加后的 `95ca1b0`
 | 待办 | 所缺内容 | 仅阻塞的动作 |
 | --- | --- | --- |
 | 独立业务/QA事后复核 | 复核人已明确；现需对 005 的安全负例 7/12 与 forbidden 1 给出实际意见及失败处置 | 业务/QA签收及其后的T6决定；不能由实现者代审，也不能用 004、合成或 #40 合入代签 |
-| leftover 后的真实离线复验 | 需新包、单次 `run_id` 授权，绑定拟测产品 SHA（当前 main `95ca1b0`，搜索代码与 `df67576` 相同）；先核验有效期、权限、manifest 锚点和清理条件。旧包已过期，不得自动续期，也不得重跑 005 | 新的真实评测；不能把 004/005 分数或 leftover 合成绿当作本 SHA 的真实验收 |
+| PR #41 合并 | 需对当时确切头 squash 合并、不删分支。合并不等于 005 已修好或 T6 | 把对象 Hamming-1 与 leftover 保护送入 origin/main |
+| leftover 后的真实离线复验 | 需新包、单次 `run_id` 授权（owner-t5-006），绑定拟测产品 SHA（若先合 #41 则为合并后 origin/main，不得把 `95ca1b0` 写成已含本修复）；先核验有效期、权限、manifest 锚点和清理条件。旧包已过期，不得自动续期，也不得重跑 005 | 新的真实评测；不能把 004/005 分数或 leftover / unseen 合成绿当作本 SHA 的真实验收 |
 
 ### 依赖未满足
 

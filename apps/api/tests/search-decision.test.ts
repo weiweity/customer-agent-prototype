@@ -219,6 +219,8 @@ describe('search decision', () => {
     expect(judgeSearch('请问恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
     expect(judgeSearch('这个恒温杯出厂温度', [kettle]).shownScriptIds).toEqual([]);
     expect(judgeSearch('恒温杯出厂温度是多少', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('恒温杯出厂', [kettle]).shownScriptIds).toEqual([]);
+    expect(judgeSearch('请问恒温杯出厂', [kettle]).shownScriptIds).toEqual([]);
     const kettleName = candidate(
       'kettle-name',
       '恒温壶',
