@@ -52,6 +52,7 @@ describe('search decision', () => {
     );
     expect(judgeSearch('便签购买两盒赠送五盒', [notes]).decision).toBe('reject');
     expect(judgeSearch('便签活动是买两盒送五盒，对不对', [notes]).decision).toBe('show');
+    expect(judgeSearch('便签购买三盒赠送两盒，对吗', [notes]).decision).toBe('show');
   });
 
   it('treats a quoted fragment as clarify, not as an assertion', () => {
@@ -145,6 +146,12 @@ describe('search decision', () => {
       decision: 'show',
       shownScriptIds: ['sunscreen'],
     });
+  });
+
+  it('does not show both Hamming-1 title variants for an ambiguous typo', () => {
+    const headset = candidate('headset-way', '耳机连接方式', '耳机连接方式', '耳机连接方式');
+    const mic = candidate('mic-way', '耳麦连接方式', '耳麦连接方式', '耳麦连接方式');
+    expect(judgeSearch('耳积连接方式', [headset, mic]).shownScriptIds).toEqual([]);
   });
 
   it('keeps an assertion of inverted invoice roles rejected', () => {

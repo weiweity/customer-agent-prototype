@@ -560,6 +560,8 @@ type CandidateVerdict = Readonly<{
   show: boolean;
   exactQuestion: boolean;
   exactTitle: boolean;
+  originalExact: boolean;
+  repairedCompact: string;
   phraseQuestion: boolean;
   phraseTitle: boolean;
   overlap: number;
@@ -695,16 +697,6 @@ function leftoverUnsupported(queryCompact: string, candidate: JudgableCandidate)
     const gram = `${chars[index]}${chars[index + 1]}`;
     if (allGrams.has(gram) || hamming1Matches(gram, titleQuestionGrams).length === 1) markRange(index, 2);
   }
-  for (const field of fields) {
-    if (field.length < 4) continue;
-    for (let size = field.length; size >= 4; size -= 1) {
-      for (const window of ngrams(field, size)) {
-        for (let index = 0; index + size <= chars.length; index += 1) {
-          if (chars.slice(index, index + size).join('') === window) markRange(index, size);
-        }
-      }
-    }
-  }
   let cursor = 0;
   while (cursor < chars.length) {
     if (explained[cursor] === true) {
@@ -800,7 +792,11 @@ function candidateConflict(
   const prefix = sharedNounPrefixMismatch(queryCompact, compactSearchText(candidate.title));
   const packaging = missingPackagingVariant(queryCompact, matchCorpus(candidate));
   const leftoverQuery = repairedCompact.length >= 4 ? repairedCompact : queryCompact;
-  const leftover = leftoverUnsupported(leftoverQuery, candidate);
+  const leftoverHit = leftoverUnsupported(leftoverQuery, candidate);
+  const leftover = leftoverHit && !(
+    intent.act === 'confirmation'
+    && (inverted || qty || polar || time || duration)
+  );
 
 
   if (ops || missing || product || override || extraCondition || politeProduct || negated || sibling || prefix || packaging || leftover) {
@@ -876,9 +872,14 @@ function dropAmbiguousVariants(
       const leftTitle = compactSearchText(byId.get(left.scriptId)?.title ?? '');
       const rightTitle = compactSearchText(byId.get(right.scriptId)?.title ?? '');
       if (!(hamming1(leftTitle, rightTitle) || singleInfix(leftTitle, rightTitle))) continue;
-      const leftExact = left.exactQuestion || left.exactTitle || queryCompact === leftTitle;
-      const rightExact = right.exactQuestion || right.exactTitle || queryCompact === rightTitle;
+      const leftExact = left.originalExact || queryCompact === leftTitle;
+      const rightExact = right.originalExact || queryCompact === rightTitle;
       if (leftExact || rightExact) continue;
+      if (
+        left.repairedCompact.length >= 4
+        && left.repairedCompact === right.repairedCompact
+        && left.repairedCompact !== queryCompact
+      ) continue;
       if (queryNormalized.length > 0 && (leftTitle.includes(queryCompact) || rightTitle.includes(queryCompact))) {
         continue;
       }
@@ -921,6 +922,7 @@ export function judgeSearch(
     const overlap = overlapScore(repairedCompact, sourceCompact);
     const exactQuestion = isExactQuestion(normalized, candidate) || isExactQuestion(repairedNormalized, candidate);
     const exactTitle = isExactTitle(normalized, candidate) || isExactTitle(repairedNormalized, candidate);
+    const originalExact = isExactQuestion(normalized, candidate) || isExactTitle(normalized, candidate);
     const phraseQuestion = candidate.questionTexts.some((question) => (
       compactSearchText(question).includes(repairedCompact)
     ));
@@ -933,6 +935,8 @@ export function judgeSearch(
       show: relevant && !conflict,
       exactQuestion,
       exactTitle,
+      originalExact,
+      repairedCompact,
       phraseQuestion,
       phraseTitle,
       overlap,
