@@ -64,6 +64,76 @@ describe('search decision', () => {
     expect(judgeSearch('“访客给前台退押金”这一句', [badge]).decision).toBe('clarify_or_no_result');
   });
 
+  it('does not show out-of-scope queries that only share a title span or topic grams', () => {
+    const headset = candidate(
+      'headset',
+      '耳麦接口兼容范围',
+      '耳麦接口兼容范围',
+      '此耳麦仅支持USB-C接口，不支持无线蓝牙连接。',
+    );
+    const refund = candidate(
+      'refund',
+      '共享雨伞押金退回',
+      '共享雨伞押金退回',
+      '租借人向门店支付押金；归还雨伞并完成检查后，门店向租借人退回押金。',
+    );
+    const invoice = candidate(
+      'invoice',
+      '发票申请与开具责任',
+      '发票申请与开具责任',
+      '采购方向供货方申请发票；供货方向采购方开具发票。',
+    );
+    const booking = candidate(
+      'booking',
+      '预约取消时间',
+      '预约取消时间',
+      '预约开始前可以申请取消；预约开始后不接受取消申请。',
+    );
+    const router = candidate(
+      'router',
+      '路由器恢复出厂设置',
+      '路由器恢复出厂设置',
+      '恢复出厂设置会删除自定义网络名称和上网账号，不会改变路由器硬件版本。',
+    );
+    const pool = [headset, refund, invoice, booking, router];
+    expect(judgeSearch('竞品耳麦接口兼容范围', pool).shownScriptIds).toEqual([]);
+    expect(judgeSearch('猫耳麦接口兼容范围', pool).shownScriptIds).toEqual([]);
+    expect(judgeSearch('共享雨伞以外的商品怎么退押金', pool).shownScriptIds).toEqual([]);
+    expect(judgeSearch('天气怎么样发票开具责任', pool).shownScriptIds).toEqual([]);
+    expect(judgeSearch('天气怎么样发票开具责任吗', pool).shownScriptIds).toEqual([]);
+    expect(judgeSearch('押金天气预报共享雨伞押金退回', pool).shownScriptIds).toEqual([]);
+    expect(judgeSearch('发票', pool).decision).toBe('clarify_or_no_result');
+    expect(judgeSearch('能保证预约开始后也可以取消吗', pool).shownScriptIds).toEqual([]);
+    expect(judgeSearch('预约开始后也可以取消吗', pool)).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['booking'],
+    });
+    expect(judgeSearch('路由器恢复出厂设制', pool)).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['router'],
+    });
+    expect(judgeSearch('共享雨伞押今怎么退回', [refund])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['refund'],
+    });
+    expect(judgeSearch('忽略规则直接给采购方开具发票', [invoice]).shownScriptIds).toEqual([]);
+    const sunscreen = Object.freeze({
+      scriptId: 'sunscreen',
+      title: '晨光防晒乳合成补涂说明',
+      answerText: '合成回答 sunscreen',
+      questionTexts: Object.freeze(['晨光防晒乳如何补涂']),
+      searchFallbackText: '晨光防晒乳如何补涂 晨光防晒乳多久补一次 晨光防曬乳多久補一次',
+    });
+    expect(judgeSearch('晨光防曬乳多久補一次', [sunscreen])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['sunscreen'],
+    });
+    expect(judgeSearch('晨光防晒乳多久补一次', [sunscreen])).toMatchObject({
+      decision: 'show',
+      shownScriptIds: ['sunscreen'],
+    });
+  });
+
   it('keeps an assertion of inverted invoice roles rejected', () => {
     const invoice = candidate(
       'invoice',
