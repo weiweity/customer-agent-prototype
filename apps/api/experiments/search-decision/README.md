@@ -17,12 +17,12 @@ pnpm test:search-decision:acceptance
 pnpm test:search-decision:known-fail
 ```
 
-- `test:search-decision`：工具自身、接口题、事实诊断、正文陈述边界、S16 限定产品差异、变异门禁。成功为 0。
-- `test:search-decision:acceptance`：完整 N 验收。N10/N19 必须导致非零。结果写 `.generated/reports/n-acceptance.json`。
-- `test:search-decision:known-fail`：机器可读失败集合恰为 N10/N19 时为 0；任何意外失败使证明失败。
+- `test:search-decision`：工具自身、接口题、事实诊断、正文陈述边界、S16 限定产品差异、变异门禁、已知失败 CLI 证明、生成判定模块类型检查。成功为 0。
+- `test:search-decision:acceptance`：完整 N 验收。N10/N19 必须导致非零。结果写该次运行的 `n-acceptance.json`。
+- `test:search-decision:known-fail`：真实 acceptance 子进程须以预期失败码退出，并核对同一次运行的 JSON：冻结 23 题全集、分母与通过/失败集合一致，失败集合恰为 N10/N19。启动失败、报告缺失/陈旧/截断或意外失败都不能当作证明通过。
 - `test:search-decision:round1`：首轮关闭范围，不含 N10/N19，成功为 0。
 
-不要用日志关键词代替 JSON 集合。
+`pnpm typecheck` 会先物化 `.generated/search-decision.ts` 再对其做 tsc；不必手工生成。不要用日志关键词代替 JSON 集合。
 
 ## 边界选择
 

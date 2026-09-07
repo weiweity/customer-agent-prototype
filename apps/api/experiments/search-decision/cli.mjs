@@ -9,6 +9,7 @@ const command = process.argv[2] ?? '';
 const vitest = path.join(apiRoot, 'node_modules/vitest/vitest.mjs');
 
 const env = { ...process.env };
+delete env.SEARCH_DECISION_LAB_TEST_UNFROZEN;
 let files;
 if (command === 'acceptance') {
   env.CUSTOMER_AGENT_SEARCH_DECISION_FULL_ACCEPTANCE = '1';

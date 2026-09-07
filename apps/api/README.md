@@ -61,6 +61,7 @@ pnpm --filter @customer-agent/api test:integration
 pnpm test:g1a:synthetic
 pnpm test:g1a:e0
 pnpm test:search-decision
+pnpm test:search-decision:round1
 pnpm test:search-decision:acceptance
 pnpm test:search-decision:known-fail
 pnpm typecheck

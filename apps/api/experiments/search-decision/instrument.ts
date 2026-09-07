@@ -15,6 +15,11 @@ export type LabBaseline = Readonly<{
   product_commit: string;
   files: Readonly<Record<string, string>>;
   fixtures: Readonly<Record<string, string>>;
+  n_cases: Readonly<{
+    ids: readonly string[];
+    known_unresolved: readonly string[];
+    unresolved_reasons: Readonly<Record<string, string>>;
+  }>;
 }>;
 
 function sha256(bytes: Buffer | string): string {
@@ -71,6 +76,15 @@ export function assertFixtureHashes(): LabBaseline {
     throw new Error(`SEARCH_DECISION_LAB_FIXTURE_DRIFT: ${errors.join('; ')}`);
   }
   return baseline;
+}
+
+export function testUnfrozenFixturesAllowed(): boolean {
+  return process.env.SEARCH_DECISION_LAB_TEST_UNFROZEN === '1';
+}
+
+export function requireFrozenFixtures(): LabBaseline {
+  if (testUnfrozenFixturesAllowed()) return loadBaseline();
+  return assertFixtureHashes();
 }
 
 const IMPORT_FIND = "import { normalizeSearchText } from './search-text.js';";

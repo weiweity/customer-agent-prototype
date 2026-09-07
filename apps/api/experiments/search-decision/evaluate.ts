@@ -3,7 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decideSearch, runOriginal, toJudgableAlias } from './decide.js';
 import { loadLabSearch } from './lab-search.js';
-import { assertFixtureHashes, assertPinnedHashes } from './instrument.js';
+import { assertPinnedHashes, loadBaseline, requireFrozenFixtures, testUnfrozenFixturesAllowed } from './instrument.js';
+import { assertFrozenNUniverse, readNAcceptanceReport, type NAcceptanceSets } from './n-report.js';
 import { fixtureRoot, reportRoot } from './paths.js';
 import type { CaseSpec, LayerResult, SyntheticSource } from './types.js';
 
@@ -11,12 +12,6 @@ const V3_STRATEGY_DIFF = Object.freeze({
   Q01: 'quoted-unusable: INTERFACE Q1 clarify; v3 reject',
   Q02: 'quoted-unusable: INTERFACE Q1 clarify; v3 reject',
   Q03: 'quoted-unusable: INTERFACE Q1 clarify; v3 reject',
-}) as Readonly<Record<string, string>>;
-
-export const KNOWN_UNRESOLVED = Object.freeze(['N10', 'N19']);
-export const KNOWN_REASONS = Object.freeze({
-  N10: 'mei-wei-marker',
-  N19: 'negation-mismatch',
 }) as Readonly<Record<string, string>>;
 
 function sha256(bytes: Buffer | string): string {
@@ -32,6 +27,7 @@ function matches(actual: LayerResult, expected: CaseSpec['expected']): boolean {
 }
 
 export function loadJson<T>(name: string): T {
+  requireFrozenFixtures();
   return JSON.parse(readFileSync(join(fixtureRoot(), name), 'utf8')) as T;
 }
 
@@ -71,18 +67,8 @@ export type NCase = {
   };
 };
 
-export type NAcceptanceSets = {
-  kind: 'N_ACCEPTANCE_SETS';
-  knownFailed: string[];
-  unexpectedFailed: string[];
-  failed: string[];
-  passed: string[];
-  expectedKnown: string[];
-  unresolvedReasons: Record<string, string>;
-  totals: { n: number; failed: number; passed: number };
-};
-
 export async function evaluateNAcceptance(): Promise<NAcceptanceSets> {
+  requireFrozenFixtures();
   const sources = loadSources();
   const byId = sourceMap(sources);
   const nCases = loadJson<{ cases: NCase[] }>('cases-n.json').cases;
@@ -91,7 +77,9 @@ export async function evaluateNAcceptance(): Promise<NAcceptanceSets> {
   const unexpectedFailed: string[] = [];
   const passed: string[] = [];
   const unresolvedReasons: Record<string, string> = {};
+  const caseIds: string[] = [];
   for (const spec of nCases) {
+    caseIds.push(spec.id);
     if (spec.unresolved) unresolvedReasons[spec.id] = String(spec.unresolved);
     const decided = await decideSearch(spec.query, poolOf(spec, byId));
     const match = decided.decision === spec.expected.decision
@@ -106,6 +94,7 @@ export async function evaluateNAcceptance(): Promise<NAcceptanceSets> {
   }
   const payload: NAcceptanceSets = {
     kind: 'N_ACCEPTANCE_SETS',
+    caseIds: [...caseIds].sort(),
     knownFailed: [...knownFailed].sort(),
     unexpectedFailed: [...unexpectedFailed].sort(),
     failed: [...failed].sort(),
@@ -114,28 +103,13 @@ export async function evaluateNAcceptance(): Promise<NAcceptanceSets> {
     unresolvedReasons,
     totals: { n: nCases.length, failed: failed.length, passed: passed.length },
   };
+  readNAcceptanceReport(payload);
   const reports = reportRoot();
   writeFileSync(join(reports, 'n-acceptance.json'), `${JSON.stringify(payload, null, 2)}\n`);
+  if (!testUnfrozenFixturesAllowed()) {
+    assertFrozenNUniverse(payload, loadBaseline().n_cases.ids);
+  }
   return payload;
-}
-
-export function assertKnownFailSets(payload: NAcceptanceSets): void {
-  const want = [...KNOWN_UNRESOLVED];
-  if (payload.kind !== 'N_ACCEPTANCE_SETS') throw new Error('kind');
-  if (JSON.stringify(payload.unexpectedFailed) !== '[]') {
-    throw new Error(`unexpectedFailed=${JSON.stringify(payload.unexpectedFailed)}`);
-  }
-  if (JSON.stringify(payload.knownFailed) !== JSON.stringify(want)) {
-    throw new Error(`knownFailed=${JSON.stringify(payload.knownFailed)}`);
-  }
-  if (JSON.stringify(payload.expectedKnown) !== JSON.stringify(want)) {
-    throw new Error(`expectedKnown=${JSON.stringify(payload.expectedKnown)}`);
-  }
-  if (JSON.stringify(payload.failed) !== JSON.stringify(want)) {
-    throw new Error(`failed=${JSON.stringify(payload.failed)}`);
-  }
-  if (payload.unresolvedReasons.N10 !== KNOWN_REASONS.N10) throw new Error('N10 reason');
-  if (payload.unresolvedReasons.N19 !== KNOWN_REASONS.N19) throw new Error('N19 reason');
 }
 
 export async function runInterfaceExperiment(): Promise<{
@@ -148,7 +122,7 @@ export async function runInterfaceExperiment(): Promise<{
   allowedV3Diffs: readonly string[];
 }> {
   const baseline = assertPinnedHashes();
-  if (process.env.SEARCH_DECISION_LAB_FIXTURE_ROOT === undefined) assertFixtureHashes();
+  requireFrozenFixtures();
   const lab = await loadLabSearch();
   const sources = loadSources();
   const byId = sourceMap(sources);
