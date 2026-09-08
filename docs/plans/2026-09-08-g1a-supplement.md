@@ -32,7 +32,7 @@
 - 原单路008对应合同及命令回归保持，不把no-hit当澄清升级；验证产物不含正文或内部定位符。
 - lint/typecheck/test/build、PG/E0专项、workspace/正式产物隔离检查；按review -> ship -> PR CI，获批后merge核验。
 
-覆盖图（计划要求，尚非PASS）：
+覆盖图（验证范围；工程结果见下文，人工观察仍待真实证据）：
 输入边界[复用] -> 双路装载/时间[新增集成] -> 排名[新增parity]
               -> 报告对齐[新增单元] -> CLI实际消费[新增E2E]
               -> 异常及清理[复用并补双路] -> 人工观察[仅真实证据可完成]
@@ -45,9 +45,11 @@
 
 后续进展：CLI实际落盘回读已通过；新增错SHA独立锚点、错时间、重复题、来源变化、缺清理、事件写入、伪计数、额外字段拒绝检查。新增受控命令test:g1a:comparison:package（未运行真实数据），运行前后要求clean HEAD及baseline pin。E0串行集成共88项通过，避免既有全局PG残留断言与新增测试并行干扰。独立检查发现的浅克隆缺历史对象已在CI配置改为完整历史；消费者现在独立接受expected candidate SHA，合法但错误SHA回归通过。
 
-尚需：算法差异/来源撤销专项、合法失败比较产物实际消费、受控入口合成端到端验证、完整验证与gstack review/ship/CI，以及具体P3准备。独立检查两项修复尚需最终复核，不将当前检查当作P2完整验收。
+该阶段待补的算法差异/来源撤销、合法失败产物消费、受控入口预演和最终复核，已由下述最终工程验证补齐；PR/CI、合并及具体P3准备仍须后续完成。
 
-补充验证（本轮）：双路真实PG合成集成5/5，包含历史AND基线拒绝包装问句而当前候选命中、未命中报告、安全失败报告实际CLI消费，以及来源暂停/owner撤销两路同拒绝。全仓lint/typecheck/test/build已通过，workspace预算与根策略通过，git diff --check通过。仍需最终修改后复核、受控入口clean候选合成预演及review/ship，尚未commit或创建PR。
+最终工程验证对应已推送代码 `1c81e314a9a98172701827b1fe390def43aae7d4`：全仓 lint/typecheck/test/build 通过，API 272 通过、59 跳过，Desktop 511 通过；E0 `:ci` 92 项全部执行通过，含新增双路真实 PG 合成集成 5/5。覆盖算法差异、未命中/安全失败报告实际 CLI 消费、来源暂停及 owner 撤销两路同拒绝。workspace、diff 检查及独立代码审查通过，未发现未解决问题。
+
+clean 候选的受控入口已用纯合成输入完成“实际命令 → CLI → 50题输出”预演：improved 1、regressed 0、unchanged 49，`real_input=false`、`t6_signed=false`。`artifact:m0:build` 和 `artifact:m0:verify` 通过，77 文件候选及78文本扫描证明比较工具未进入正式 runtime 候选；产物仍为不可部署且 `runtime_activated=false`。这些均不构成真实比较、人工观察或T6证据。下一步为 PR 及确切头提交的 CI，合并另行授权。
 
 ## 运行入口与最终检查
 
@@ -70,10 +72,10 @@
 
 ## Implementation Tasks
 
-- [ ] T1：冻结历史关键词算法与版本来源，补parity测试。
-- [ ] T2：在既有生命周期中实现双路评测，保持单路兼容。
-- [ ] T3：比较合同与CLI实际消费，完成异常矩阵。
-- [ ] T4：工程验证、review、ship、CI与明确合并。
+- [x] T1：冻结历史关键词算法与版本来源，补parity测试。
+- [x] T2：在既有生命周期中实现双路评测，保持单路兼容。
+- [x] T3：比较合同与CLI实际消费，完成异常矩阵。
+- [ ] T4：工程验证、review已完成；ship交付、PR CI与明确合并待完成。
 - [ ] T5：具体真实补证运行与人工观察。
 - [ ] T6：证据复核与真实签发。
 
@@ -86,7 +88,7 @@
 | Eng Review | 1 | ENGINEERING CLEAR | 两项计划风险与CI接线问题已落实验证；真实门另行保留 |
 | Outside voice | 1 | COMPLETE | 冻结完整算法；两路同事务。已纳入，不冒称跨模型 |
 
-VERDICT: 工程边界评审完成；P2等待候选预演和交付，P3/P4未完成。
+VERDICT: 工程边界评审、P2本地实现与候选合成预演完成，等待PR/CI及获批合并；P1真实采用口径待治理确认，P3/P4未完成。
 
 **UNRESOLVED DECISIONS:**
 - 真实基线采用与人工观察证据类型须治理确认；具体运行与T6分别取得实际授权。
