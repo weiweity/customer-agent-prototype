@@ -33,6 +33,21 @@
 
 完整运行 lint/typecheck/test/build、workspace/docs 检查及合成 PostgreSQL/SearchBackend 链路。新内容独立复审后交付 PR；生成报告与实验不进入正式候选包。
 
+### 2026-09-08 本地验证完成
+
+被测代码提交为 `08470e492e72ceb7046f5434484bdbfcb3cc717b`，环境为本机 Node.js 24 / pnpm 11.19.0。该候选已提交并推送，当前待 PR 交付及对应 CI；本节只记录本地证据，不代表已合并。
+
+| 验证面 | 实际结果 |
+| --- | --- |
+| 冻结合成验收 | N 23/23、接口题 75/75、实现前冻结的独立否定回归 15/15；原题集与 round1 字节未变。额外回归现为已见数据，不是业务 holdout 或泛化证明 |
+| 静态检查与构建 | `pnpm lint`、`pnpm typecheck`、完整构建通过；生成诊断类型与产品源码 pin 均核验 |
+| 完整测试 | 最终 `pnpm artifact:m0:build --check` 实际执行构建及测试：contracts 17、database 19、API 256、desktop 511、产物边界 9、工作流 3 均通过；普通 API lane 的 52 项显式跳过不计 PASS |
+| PostgreSQL 15 专项 | API 集成 64/64；合成 E0 84/84，覆盖实际来源/平台/SKU 门、SearchBackend、报告 CLI 消费与落盘回读及清理 |
+| 独立代码复审 | 21/21 检查完成；混合断言和正文引用/条件误作事实的两项 P1、跨主体关系极性误拒的一项 P2 已修复并复核关闭 |
+| 实际服务候选产物 | `pnpm artifact:m0:build --check` 与 `pnpm artifact:m0:verify` 均退出 0；manifest 记录上述 buildGitSha，77 个文件通过后验，不含 experiments、fixtures、.generated、reports 或 testkit 目录，`deployable=false`、`runtime_activated=false` |
+
+原始日志 `customer-agent-negation-artifact-final.log`、`customer-agent-negation-pg-final.log`、`customer-agent-negation-e0-final.log` 已归档于仓外 `customer-agent-search-review-2026-09-07/negation-final-evidence/`；同一证据根的 `search-negation-code-review.md` 保存独立审查。后续纯说明文档提交复用未变化的代码证据，PR 头的 CI 仍须独立核验。未运行真实 007、未签 T6，也未进行桌面实机、签名安装包或部署验收；本次没有桌面行为或权限变更。
+
 ## 不在本次范围与后续
 
 SourceAnnotation 的正式维护/合同、公开 clarify 协议、真实 owner-t5-007 与业务/QA/T6、正式身份内容链、桌面 adapter、试装及发布都保留后续入口。007 需要准确候选、有效新包窗口和单次运行授权；不重跑已使用的 006。

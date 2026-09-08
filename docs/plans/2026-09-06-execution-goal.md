@@ -49,7 +49,7 @@
 
 [PR #44](https://github.com/weiweity/customer-agent-prototype/pull/44) 已按明确授权 squash 合并为 `1ed7b00b258752c11ac7d034a744b6c247616b0b`，合并后 CI [34177126007](https://github.com/weiweity/customer-agent-prototype/actions/runs/34177126007) 五项全部通过。其历史实验 N 验收为 21/23，N10/N19 失败记录保持不变。
 
-当前继续[否定语义修复计划](2026-09-08-search-negation-repair.md)：用户明确允许 Codex 接手实现，工作区 `codex/search-negation-repair`。关系证据与冲突规则由 API 纯判定模块统一拥有，既有 SearchBackend 直接使用；实验只读取诊断，SourceAnnotation/demand 不进入正式 API。N10 只澄清不展示，N19 同关系确认必须由正文事实支持；新增混合断言、正文转述/条件/引述及跨主体反例。当前处于最终验证与 PR 交付，尚未合并本轮修复。新 PR 合并须对应明确授权。
+当前继续[否定语义修复计划](2026-09-08-search-negation-repair.md)：用户明确允许 Codex 接手实现，工作区 `codex/search-negation-repair`。关系证据与冲突规则由 API 纯判定模块统一拥有，既有 SearchBackend 直接使用；实验只读取诊断，SourceAnnotation/demand 不进入正式 API。N10 只澄清不展示，N19 同关系确认必须由正文事实支持；新增混合断言、正文转述/条件/引述及跨主体反例。本地实现、独立复审和最终候选验证已完成，代码提交 `08470e492e72ceb7046f5434484bdbfcb3cc717b` 已推送；完整验证结果见修复计划。下一步为创建 PR 并核验其确切头提交的 CI，尚未合并本轮修复。新 PR 合并须对应明确授权。
 
 业务范围是 Menokin 护肤品/化妆品。已有通用物品测试只用于工程边界回归，不是客服实际话术；新增面向业务的回归须显式标为合成，真实验收只使用获批受控输入。005/006 的脱敏结果与 17 个失败题索引已在仓外整理并回读校验，复核人仍按既有指定；用户要求继续工作，不等于提供业务/QA复核意见或签收。
 
