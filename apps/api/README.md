@@ -63,7 +63,7 @@ pnpm test:g1a:e0
 pnpm test:search-decision
 pnpm test:search-decision:round1
 pnpm test:search-decision:acceptance
-pnpm test:search-decision:known-fail
+pnpm test:search-decision:proof
 pnpm typecheck
 pnpm build
 pnpm workspace:check
