@@ -34,6 +34,7 @@ const packageJson = JSON.parse(
   };
 };
 const packageWindows = readFileSync(path.join(root, 'scripts/package-windows.mjs'), 'utf8');
+const electronViteConfig = readFileSync(path.join(root, 'electron.vite.config.ts'), 'utf8');
 const verifyWindowsPackage = readFileSync(
   path.join(root, 'scripts/verify-windows-package.mjs'),
   'utf8',
@@ -60,7 +61,10 @@ describe('Windows local-unsigned packaging contract', () => {
 
     expect(packageWindows).toContain('scripts/generate-app-icons.mjs');
     expect(packageWindows).toContain("node_modules/electron-vite/bin/electron-vite.js");
+    expect(packageWindows).toContain('assertMainBundle(desktopRoot)');
+    expect(packageWindows).toContain('assertMainBundleHasNoWorkspaceBareImports');
     expect(packageWindows).toContain("node_modules/electron-builder/out/cli/cli.js");
+    expect(electronViteConfig).toContain("externalizeDepsPlugin({ exclude: ['@customer-agent/contracts'] })");
     expect(packageWindows).not.toMatch(/execFileSync\(['"](?:pnpm|electron-builder)['"]/);
     expect(packageWindows).toContain("WINDOWS_LOCAL_UNSIGNED_OUTPUT = 'release/local-unsigned/windows'");
     expect(packageWindows).toContain("buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false'");
@@ -165,6 +169,7 @@ describe('Windows local-unsigned packaging contract', () => {
         }
       },
       resetOutput: vi.fn(),
+      assertMainBundle: vi.fn(),
     });
     expect(packaged).toBe(true);
     expect(cleanup).toHaveBeenCalledOnce();
@@ -195,6 +200,7 @@ describe('Windows local-unsigned packaging contract', () => {
             options: Record<string, unknown>,
           ) => void;
           resetOutput: (projectRoot: string) => string;
+          assertMainBundle?: (desktopRoot: string) => void;
         },
       ) => void;
     };
@@ -215,6 +221,7 @@ describe('Windows local-unsigned packaging contract', () => {
       prepareSystemCa: () => ({ environment: {}, cleanup }),
       runCommand,
       resetOutput,
+      assertMainBundle: vi.fn(),
     })).toThrow(failure);
 
     expect(cleanup).toHaveBeenCalledOnce();
@@ -247,6 +254,7 @@ describe('Windows local-unsigned packaging contract', () => {
             options: Record<string, unknown>,
           ) => void;
           resetOutput: (projectRoot: string) => string;
+          assertMainBundle?: (desktopRoot: string) => void;
         },
       ) => void;
     };
@@ -257,6 +265,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(() => packageRunner.packageWindows('local', {
       prepareSystemCa: () => ({ environment: {}, cleanup }),
       runCommand,
+      assertMainBundle: vi.fn(),
       resetOutput: () => {
         throw failure;
       },
@@ -264,6 +273,31 @@ describe('Windows local-unsigned packaging contract', () => {
 
     expect(cleanup).toHaveBeenCalledOnce();
     expect(runCommand).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops packaging when the main bundle still imports workspace packages', async () => {
+    const packageRunner = await import(
+      pathToFileURL(path.join(root, 'scripts/package-windows.mjs')).href
+    );
+    const { mainBundleHasWorkspaceBareImport } = await import(
+      pathToFileURL(path.join(root, 'scripts/assert-main-bundle.mjs')).href
+    ) as { mainBundleHasWorkspaceBareImport: (source: string) => boolean };
+    expect(mainBundleHasWorkspaceBareImport('import { parseContractSchema } from "@customer-agent/contracts";')).toBe(true);
+    expect(mainBundleHasWorkspaceBareImport('const x = 1;')).toBe(false);
+    const cleanup = vi.fn();
+    const resetOutput = vi.fn();
+    const runCommand = vi.fn();
+    expect(() => packageRunner.packageWindows('local', {
+      prepareSystemCa: () => ({ environment: {}, cleanup }),
+      runCommand,
+      resetOutput,
+      assertMainBundle: () => {
+        throw new Error('workspace import');
+      },
+    })).toThrow('workspace import');
+    expect(resetOutput).not.toHaveBeenCalled();
+    expect(runCommand).toHaveBeenCalledTimes(3);
+    expect(cleanup).toHaveBeenCalledOnce();
   });
 
   it('fail-closes against incomplete or update-enabled Windows package fixtures', async () => {

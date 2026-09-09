@@ -3,6 +3,7 @@ import { rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { prepareNodeSystemCaEnvironment } from './node-system-ca.mjs';
+import { assertMainBundleHasNoWorkspaceBareImports } from './assert-main-bundle.mjs';
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(desktopRoot, '../..');
@@ -48,6 +49,8 @@ export function packageWindows(
     ?? prepareNodeSystemCaEnvironment;
   const runCommand = dependencies.runCommand ?? execFileSync;
   const resetOutput = dependencies.resetOutput ?? resetWindowsPackageOutput;
+  const assertMainBundle = dependencies.assertMainBundle
+    ?? assertMainBundleHasNoWorkspaceBareImports;
   const systemCa = prepareSystemCa();
   const buildEnvironment = systemCa.environment;
   buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
@@ -76,6 +79,7 @@ export function packageWindows(
         stdio: 'inherit',
       },
     );
+    assertMainBundle(desktopRoot);
 
     resetOutput(repositoryRoot);
 
