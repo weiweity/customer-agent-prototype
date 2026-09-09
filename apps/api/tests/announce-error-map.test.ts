@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Pool } from 'pg';
 import { createAnnounceServiceForPool } from '../src/announce-service.js';
 
 const LOG_HASH = Object.freeze({ version: 'hmac-log-v1', key: 'synthetic-t5-log-hash-material-00000001' });
@@ -21,7 +22,7 @@ describe('announce SQL error mapping', () => {
       query: async () => ({ rows: [] }),
       end: async () => undefined,
     };
-    const service = createAnnounceServiceForPool(pool, LOG_HASH, false);
+    const service = createAnnounceServiceForPool(pool as unknown as Pool, LOG_HASH, false);
     const result = await service.snapshot({
       actor: { user_id: 'usr_t5_owner', role: 'owner', auth_mode: 'mock' },
       clientId: 'mac-cs-t5-001',
