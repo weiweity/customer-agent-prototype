@@ -2,22 +2,20 @@
 
 > **复核：** 2026-09-10。四项 P3 窄分支已在 `codex/macos-p3-narrow-tests` 补齐自动化覆盖；它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。登录残留红字由独立切片处理。
 
-## Follow-up
+## Completed
 
 ### Login residual invalid banner
 
-**What:** After a successful synthetic login, Query still shows a residual red invalid-style prompt (user-reported 「合成登录…」). `sessionAction` in `apps/desktop/src/renderer/QueryApp.tsx` currently sets `invalidMessage` to 「合成登录成功，请确认平台和商品后查询」 on success. Register only; do not fix in this test-coverage PR.
+**What:** After a successful synthetic login, Query no longer reuses the red `invalidMessage` banner. Session notices distinguish unsigned, success, expired, and failed; restore and re-login paths are covered.
 
-**Why:** Login success should not reuse the invalid/error banner. Independent of D1–D5 closeout and of Windows packaging.
+**Why:** Login success must not look like a validation error. Independent of D1–D5 closeout and of Windows packaging.
 
-**Context:** User-reported during the Mac synthetic observation. Not a Windows-device finding. Tracked in `codex/macos-m2-login-status`.
+**Context:** Fixed in `codex/macos-m2-login-status` for the macOS synthetic query-experience slice. Not a Windows-device finding.
 
 **Effort:** S
 **Priority:** P3
 **Depends on:** None
-**Status:** OPEN
-
-## Completed
+**Status:** DONE
 
 ### Cover the unavailable WindowContext branch
 
