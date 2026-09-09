@@ -87,7 +87,7 @@ describe('product announce lease and snapshot', () => {
   it('returns 304 without issuing a new lease or mixing snapshot releases', async () => {
     let currents = 0;
     const expiry = expiresAt();
-    const f = await setup(url => new Response(null, { status: 404 }));
+    const f = await setup(_url => new Response(null, { status: 404 }));
     f.transport.mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(String(input));
       if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
@@ -106,9 +106,9 @@ describe('product announce lease and snapshot', () => {
       return new Response(null, { status: 404 });
     });
     expect(await f.announce.refresh(f.identity)).toMatchObject({ code: 'VALIDATION' });
-    const ok = await setup(async url => new Response(null, { status: 404 }));
+    const ok = await setup(async _url => new Response(null, { status: 404 }));
     let seen = 0;
-    ok.transport.mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
+    ok.transport.mockImplementation(async (input: string | URL | Request, _init?: RequestInit) => {
       const url = new URL(String(input));
       if (url.pathname.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
       if (url.pathname === '/v1/announce/current') {
