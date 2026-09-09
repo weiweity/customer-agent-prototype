@@ -393,28 +393,7 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
         'x-snapshot-lease': unknownLease,
       },
     });
-    if (invalidLease.statusCode !== 403) {
-      let sql: unknown = null;
-      try {
-        await admin.query('SET ROLE t5_runtime');
-        await admin.query(
-          'SELECT * FROM public.read_snapshot_page($1,$2,$3,$4,NULL,200)',
-          [unknownLease, CLIENT_ID, 'usr_t5_owner', release.release_id],
-        );
-      } catch (error) {
-        sql = error !== null && typeof error === 'object'
-          ? {
-            code: Reflect.get(error, 'code'),
-            detail: Reflect.get(error, 'detail'),
-            message: error instanceof Error ? error.message : String(error),
-            keys: Object.keys(error),
-          }
-          : String(error);
-      } finally {
-        await admin.query('RESET ROLE').catch(() => undefined);
-      }
-      expect.fail(JSON.stringify({ http: invalidLease.json(), sql }));
-    }
+    expect(invalidLease.statusCode, JSON.stringify(invalidLease.json())).toBe(403);
     expect(invalidLease.json().error.details.reason).toBe('OFFLINE_LEASE_INVALID');
 
     const refreshed = await app.inject({

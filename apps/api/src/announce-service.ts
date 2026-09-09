@@ -121,9 +121,19 @@ async function rollbackTxn(client: PoolClient): Promise<boolean> {
   }
 }
 
+function unwrapError(error: unknown): unknown {
+  if (Array.isArray(error) && error.length > 0) return unwrapError(error[0]);
+  if (error !== null && typeof error === 'object') {
+    const cause = Reflect.get(error, 'cause');
+    if (cause !== undefined) return unwrapError(cause);
+  }
+  return error;
+}
+
 function fieldOf(error: unknown, name: string): string {
-  if (error === null || typeof error !== 'object') return '';
-  const value = Reflect.get(error, name);
+  const unwrapped = unwrapError(error);
+  if (unwrapped === null || typeof unwrapped !== 'object') return '';
+  const value = Reflect.get(unwrapped, name);
   return value === undefined || value === null ? '' : String(value).trim();
 }
 
@@ -247,7 +257,8 @@ function mapCurrent(row: CurrentRow): CurrentAnnouncementResponse {
 }
 
 function mapSnapshot(row: SnapshotRow, leaseToken: string): SnapshotResponse {
-  const itemsRaw = row.items_json;
+  const raw = row.items_json;
+  const itemsRaw = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw;
   if (!Array.isArray(itemsRaw)) throw new Error('SNAPSHOT_ITEMS_INVALID');
   const items: SnapshotItem[] = [];
   for (const entry of itemsRaw) {
@@ -274,8 +285,9 @@ function announceFailure(
   error: unknown,
   operation: 'announce_current' | 'announce_snapshot' | 'announce_ack',
 ): AnnounceFailure {
-  const reason = contractReason(error);
-  const state = sqlStateOf(error);
+  const unwrapped = unwrapError(error);
+  const reason = contractReason(unwrapped);
+  const state = sqlStateOf(unwrapped);
   if (LEASE_REASONS.has(reason) || reason === 'SOURCE_SUSPENDED' || reason === 'SOURCE_NOT_ELIGIBLE') {
     return failure('FORBIDDEN', reason as SourceContractReason);
   }
@@ -437,31 +449,60 @@ export function createAnnounceServiceForPool(
       const client = await pool.connect().catch(() => null);
       if (client === null) return failure('OVERLOADED');
       try {
-        const result = await client.query<SnapshotRow>(
-          'SELECT * FROM public.read_snapshot_page($1,$2,$3,$4,$5,$6)',
-          [
-            request.leaseToken,
-            request.clientId,
-            request.actor.user_id,
+        let result;
+        try {
+          result = await client.query<SnapshotRow>(
+            'SELECT * FROM public.read_snapshot_page($1,$2,$3,$4,$5,$6)',
+            [
+              request.leaseToken,
+              request.clientId,
+              request.actor.user_id,
+              request.releaseId,
+              request.cursor,
+              request.limit,
+            ],
+          );
+        } catch (error) {
+          let mapped = announceFailure(error, 'announce_snapshot');
+          if (mapped.code === 'INTERNAL') {
+            report(error);
+            mapped = failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID');
+          }
+          return deny(
+            'announce_snapshot',
+            request.actor,
+            mapped,
+            `${request.clientId}:${request.releaseId}`,
             request.releaseId,
-            request.cursor,
-            request.limit,
-          ],
-        );
+            null,
+          );
+        }
         const row = result.rows[0];
         if (row === undefined) return failure('NOT_FOUND');
-        return Object.freeze({ ok: true as const, response: mapSnapshot(row, request.leaseToken) });
-      } catch (error) {
-        const mapped = announceFailure(error, 'announce_snapshot');
-        if (mapped.code === 'INTERNAL') report(error);
-        return deny(
-          'announce_snapshot',
-          request.actor,
-          mapped,
-          `${request.clientId}:${request.releaseId}`,
-          request.releaseId,
-          null,
-        );
+        if (row.lease_expires_at === null || row.lease_expires_at === undefined
+          || row.release_id === undefined || row.release_id === null) {
+          return deny(
+            'announce_snapshot',
+            request.actor,
+            failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID'),
+            `${request.clientId}:${request.releaseId}`,
+            request.releaseId,
+            null,
+          );
+        }
+        try {
+          return Object.freeze({ ok: true as const, response: mapSnapshot(row, request.leaseToken) });
+        } catch (error) {
+          report(error);
+          return deny(
+            'announce_snapshot',
+            request.actor,
+            failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID'),
+            `${request.clientId}:${request.releaseId}`,
+            request.releaseId,
+            null,
+          );
+        }
       } finally {
         client.release(false);
       }
