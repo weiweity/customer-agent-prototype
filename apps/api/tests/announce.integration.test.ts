@@ -393,7 +393,7 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
         'x-snapshot-lease': unknownLease,
       },
     });
-    expect(invalidLease.statusCode).toBe(403);
+    expect(invalidLease.statusCode, JSON.stringify(invalidLease.json())).toBe(403);
     expect(invalidLease.json().error.details.reason).toBe('OFFLINE_LEASE_INVALID');
 
     const refreshed = await app.inject({

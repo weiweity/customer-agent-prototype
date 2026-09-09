@@ -121,9 +121,30 @@ async function rollbackTxn(client: PoolClient): Promise<boolean> {
   }
 }
 
-function detailOf(error: unknown): string {
+function fieldOf(error: unknown, name: string): string {
   if (error === null || typeof error !== 'object') return '';
-  return String(Reflect.get(error, 'detail') ?? '');
+  const value = Reflect.get(error, name);
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function contractReason(error: unknown): string {
+  const detail = fieldOf(error, 'detail');
+  if (LEASE_REASONS.has(detail)
+    || detail === 'SOURCE_GATE_NOT_READY'
+    || detail === 'SOURCE_SUSPENDED'
+    || detail === 'SOURCE_NOT_ELIGIBLE'
+    || detail === 'FORBIDDEN'
+    || detail === 'VALIDATION'
+    || detail === 'NOT_FOUND') {
+    return detail;
+  }
+  const message = (error instanceof Error ? error.message : fieldOf(error, 'message')).trim().toLowerCase();
+  if (message.includes('expired')) return 'OFFLINE_LEASE_EXPIRED';
+  if (message.includes('binding')) return 'OFFLINE_LEASE_BINDING_MISMATCH';
+  if (message.includes('token is invalid') || message.includes('lease token')) return 'OFFLINE_LEASE_INVALID';
+  if (message.includes('not ready')) return 'SOURCE_GATE_NOT_READY';
+  if (message.includes('belongs to another')) return 'FORBIDDEN';
+  return detail;
 }
 
 function asIso(value: unknown): string {
@@ -242,13 +263,20 @@ function announceFailure(
   error: unknown,
   operation: 'announce_current' | 'announce_snapshot' | 'announce_ack',
 ): AnnounceFailure {
-  const detail = detailOf(error);
-  if (LEASE_REASONS.has(detail) || detail === 'SOURCE_SUSPENDED' || detail === 'SOURCE_NOT_ELIGIBLE') {
-    return failure('FORBIDDEN', detail as SourceContractReason);
+  const reason = contractReason(error);
+  const state = fieldOf(error, 'code');
+  if (LEASE_REASONS.has(reason) || reason === 'SOURCE_SUSPENDED' || reason === 'SOURCE_NOT_ELIGIBLE') {
+    return failure('FORBIDDEN', reason as SourceContractReason);
   }
-  if (detail === 'SOURCE_GATE_NOT_READY') {
+  if (reason === 'SOURCE_GATE_NOT_READY' || (state === 'ZA004' && operation === 'announce_current')) {
     return failure(operation === 'announce_ack' ? 'FORBIDDEN' : 'SOURCE_GATE_NOT_READY', 'SOURCE_GATE_NOT_READY');
   }
+  if (state === 'ZA004') {
+    return failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID');
+  }
+  if (reason === 'FORBIDDEN') return failure('FORBIDDEN');
+  if (reason === 'VALIDATION') return failure('VALIDATION');
+  if (reason === 'NOT_FOUND') return failure('NOT_FOUND');
   return failure(mapDatabaseContractError(error));
 }
 
@@ -413,10 +441,12 @@ export function createAnnounceServiceForPool(
         if (row === undefined) return failure('NOT_FOUND');
         return Object.freeze({ ok: true as const, response: mapSnapshot(row, request.leaseToken) });
       } catch (error) {
+        const mapped = announceFailure(error, 'announce_snapshot');
+        if (mapped.code === 'INTERNAL') report(error);
         return deny(
           'announce_snapshot',
           request.actor,
-          announceFailure(error, 'announce_snapshot'),
+          mapped,
           `${request.clientId}:${request.releaseId}`,
           request.releaseId,
           null,
