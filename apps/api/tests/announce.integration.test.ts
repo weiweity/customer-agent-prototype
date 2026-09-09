@@ -384,7 +384,7 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
     expect(search.json().hit_status).toBe('hit');
     expect(search.json().release_id).toBe(release.release_id);
 
-    const unknownLease = `osl_${'0'.repeat(64)}`;
+    const unknownLease = `osl_${'ab'.repeat(32)}`;
     const invalidLease = await app.inject({
       url: `/v1/announce/snapshot?release_id=${release.release_id}`,
       headers: {
@@ -393,7 +393,28 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
         'x-snapshot-lease': unknownLease,
       },
     });
-    expect(invalidLease.statusCode, JSON.stringify(invalidLease.json())).toBe(403);
+    if (invalidLease.statusCode !== 403) {
+      let sql: unknown = null;
+      try {
+        await admin.query('SET ROLE t5_runtime');
+        await admin.query(
+          'SELECT * FROM public.read_snapshot_page($1,$2,$3,$4,NULL,200)',
+          [unknownLease, CLIENT_ID, 'usr_t5_owner', release.release_id],
+        );
+      } catch (error) {
+        sql = error !== null && typeof error === 'object'
+          ? {
+            code: Reflect.get(error, 'code'),
+            detail: Reflect.get(error, 'detail'),
+            message: error instanceof Error ? error.message : String(error),
+            keys: Object.keys(error),
+          }
+          : String(error);
+      } finally {
+        await admin.query('RESET ROLE').catch(() => undefined);
+      }
+      expect.fail(JSON.stringify({ http: invalidLease.json(), sql }));
+    }
     expect(invalidLease.json().error.details.reason).toBe('OFFLINE_LEASE_INVALID');
 
     const refreshed = await app.inject({

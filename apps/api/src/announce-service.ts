@@ -124,7 +124,18 @@ async function rollbackTxn(client: PoolClient): Promise<boolean> {
 function fieldOf(error: unknown, name: string): string {
   if (error === null || typeof error !== 'object') return '';
   const value = Reflect.get(error, name);
-  return typeof value === 'string' ? value.trim() : '';
+  return value === undefined || value === null ? '' : String(value).trim();
+}
+
+function sqlStateOf(error: unknown): string {
+  const direct = fieldOf(error, 'code');
+  if (/^[0-9A-Z]{5}$/.test(direct)) return direct;
+  if (error === null || typeof error !== 'object') return '';
+  const fields = Reflect.get(error, 'fields');
+  if (fields === null || typeof fields !== 'object') return '';
+  const nested = Reflect.get(fields, 'C') ?? Reflect.get(fields, 'code');
+  const state = nested === undefined || nested === null ? '' : String(nested).trim();
+  return /^[0-9A-Z]{5}$/.test(state) ? state : '';
 }
 
 function contractReason(error: unknown): string {
@@ -141,9 +152,9 @@ function contractReason(error: unknown): string {
   const message = (error instanceof Error ? error.message : fieldOf(error, 'message')).trim().toLowerCase();
   if (message.includes('expired')) return 'OFFLINE_LEASE_EXPIRED';
   if (message.includes('binding')) return 'OFFLINE_LEASE_BINDING_MISMATCH';
-  if (message.includes('token is invalid') || message.includes('lease token')) return 'OFFLINE_LEASE_INVALID';
-  if (message.includes('not ready')) return 'SOURCE_GATE_NOT_READY';
   if (message.includes('belongs to another')) return 'FORBIDDEN';
+  if (message.includes('not ready') || message.includes('source gate')) return 'SOURCE_GATE_NOT_READY';
+  if (message.includes('offline lease')) return 'OFFLINE_LEASE_INVALID';
   return detail;
 }
 
@@ -264,7 +275,7 @@ function announceFailure(
   operation: 'announce_current' | 'announce_snapshot' | 'announce_ack',
 ): AnnounceFailure {
   const reason = contractReason(error);
-  const state = fieldOf(error, 'code');
+  const state = sqlStateOf(error);
   if (LEASE_REASONS.has(reason) || reason === 'SOURCE_SUSPENDED' || reason === 'SOURCE_NOT_ELIGIBLE') {
     return failure('FORBIDDEN', reason as SourceContractReason);
   }
