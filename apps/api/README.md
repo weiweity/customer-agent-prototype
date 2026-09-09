@@ -80,8 +80,7 @@ Owner 通过 `POST /v1/content/publish` 与 `POST /v1/content/rollback` 调用�
 从本包 `dist/main.js` 与 `dist/content-worker-main.js` 拉起独立 API/worker 进程，在隔离 PG15 上跑导入→审核→发布→current/snapshot/ack→search，并覆盖 worker SIGKILL 恢复与取消后不得 staged。命令：
 
 ```bash
-pnpm --filter @customer-agent/api build
-CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/backend-runtime.e2e.test.ts
+pnpm --filter @customer-agent/api test:e2e:backend
 ```
 
 这只证明单主机合成开发测试闭环，不是真实飞书接入、Windows 或部署。
