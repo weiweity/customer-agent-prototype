@@ -4,12 +4,29 @@
  *
  * Official OpenAI-compatible API: https://api.minimaxi.com/v1/chat/completions
  * (intl: https://api.minimax.io/v1). M3 thinking is disabled for latency.
+ *
+ * Electron main uses Chromium `net.fetch` so macOS trusts WoTrus/USERTrust;
+ * Node's Mozilla CA bundle does not, and undici fetch would silently fall back.
  */
+import { createRequire } from 'node:module';
 import type { RankedRetrieval } from '../shared/hybrid-retrieve';
 
 export type Reranker = Readonly<{
   rerank(query: string, ranked: readonly RankedRetrieval[]): Promise<readonly RankedRetrieval[]>;
 }>;
+
+export type MinimaxRerankerOptions = Readonly<{
+  fetchImpl?: typeof fetch;
+}>;
+
+function electronFetch(): typeof fetch | null {
+  try {
+    const electron = createRequire(import.meta.url)('electron') as { net?: { fetch?: typeof fetch } };
+    return typeof electron.net?.fetch === 'function' ? electron.net.fetch.bind(electron.net) : null;
+  } catch {
+    return null;
+  }
+}
 
 const DEFAULT_BASE = 'https://api.minimaxi.com/v1';
 const DEFAULT_MODEL = 'MiniMax-M3';
@@ -49,11 +66,12 @@ function mergeOrder(preferred: readonly string[], ranked: readonly RankedRetriev
   return out;
 }
 
-export function loadMinimaxReranker(): Reranker | null {
+export function loadMinimaxReranker(options: MinimaxRerankerOptions = {}): Reranker | null {
   const apiKey = process.env.MINIMAX_API_KEY?.trim();
   if (!apiKey) return null;
   const base = (process.env.MINIMAX_BASE_URL?.trim() || DEFAULT_BASE).replace(/\/$/, '');
   const model = process.env.MINIMAX_MODEL?.trim() || DEFAULT_MODEL;
+  const fetchImpl = options.fetchImpl ?? electronFetch() ?? fetch;
   return Object.freeze({
     async rerank(query: string, ranked: readonly RankedRetrieval[]) {
       if (ranked.length <= 1) return ranked;
@@ -78,7 +96,7 @@ export function loadMinimaxReranker(): Reranker | null {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
       try {
-        const response = await fetch(`${base}/chat/completions`, {
+        const response = await fetchImpl(`${base}/chat/completions`, {
           method: 'POST',
           headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
           body: JSON.stringify(payload),
@@ -90,8 +108,11 @@ export function loadMinimaxReranker(): Reranker | null {
         if (typeof content !== 'string') return ranked;
         const ids = parseRerankIds(content, allowed);
         if (ids.length === 0) return ranked;
+        console.log('[minimax-rerank] ok');
         return Object.freeze(mergeOrder(ids, ranked));
-      } catch {
+      } catch (error) {
+        const detail = error instanceof Error ? error.name : 'error';
+        console.warn(`[minimax-rerank] fallback ${detail}`);
         return ranked;
       } finally {
         clearTimeout(timer);
