@@ -9,6 +9,8 @@ import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscala
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
 import { SYNTHETIC_CATALOG } from '../shared/synthetic-catalog';
 import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
+import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog';
+import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 
 export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
 
@@ -64,6 +66,8 @@ export class ProductSearch {
     private readonly announce: AnnounceGate,
     private readonly help: SearchHelp = { openEntry: () => false },
     private readonly retrieve: SemanticRetriever = loadSemanticRetriever(),
+    private readonly hydrate: HydrateCatalog | null = loadHydrateCatalog(),
+    private readonly rerank: Reranker | null = loadMinimaxReranker(),
   ) {
     const forget = () => {
       for (const state of this.states.values()) state.controller.abort();
@@ -126,8 +130,26 @@ export class ProductSearch {
       state.productRef = request.productContextRef;
       state.unscopedProducts = request.productUnscoped;
       const rewritten = this.retrieve.rank(request.queryText.trim());
-      const queryTexts = rewritten.length > 0 ? rewritten.map((row) => row.title) : [request.queryText.trim()];
-      const jobs = rewritten.length > 0 ? storewideJobs(request) : searchJobs(request);
+      const ranked = this.rerank && rewritten.length > 0
+        ? await this.rerank.rerank(request.queryText.trim(), rewritten)
+        : rewritten;
+      if (ranked.length > 0 && this.hydrate) {
+        const local = this.hydrate.hydrate(ranked).filter((candidate) => this.usable(candidate, state));
+        if (local.length > 0) {
+          if (!this.announce.allows(local[0]!.release_id)) throw new ProductHttpError('STALE');
+          const queryId = randomUUID();
+          const origins = new Map(local.map((candidate) => [candidate.script_id, queryId]));
+          const result: Extract<ProductSearchResult, { ok: true }> = {
+            ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
+            queryId, hitStatus: 'hit', releaseId: local[0]!.release_id,
+            telemetryStatus: 'collection_disabled', candidates: local,
+          };
+          state.origins = origins;
+          state.result = structuredClone(result); this.last.set(sender, state); return result;
+        }
+      }
+      const queryTexts = ranked.length > 0 ? ranked.slice(0, 1).map((row) => row.title) : [request.queryText.trim()];
+      const jobs = ranked.length > 0 ? storewideJobs(request).slice(0, 1) : searchJobs(request);
       const pages = await Promise.all(queryTexts.flatMap((queryText) => jobs.map(async (job) => {
         const queryId = randomUUID();
         const { value } = await this.session.request(request.sessionEpoch, '/v1/search', { signal: state.controller.signal, body: {

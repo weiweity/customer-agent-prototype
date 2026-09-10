@@ -105,6 +105,27 @@ describe('product query and native copy provenance', () => {
     expect(isProductSearchRequest({ ...f.request, productContextType: 'sku' })).toBe(false);
     expect(isProductCopyRequest({ ...f.copy, answerText: 'injected' })).toBe(false); await f.session.logout();
   });
+  it('hydrates ranked scripts locally without calling /v1/search', async () => {
+    const retrieve = {
+      rank: () => [{
+        scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
+        answerText: candidate.answer_text, score: 1,
+      }],
+    };
+    const hydrate = {
+      releaseId: candidate.release_id,
+      candidate: () => candidate,
+      hydrate: () => [candidate],
+    };
+    const f = await fixture();
+    const search = new ProductSearch(f.session, f.write, f.announce, f.help, retrieve, hydrate);
+    const before = f.transport.mock.calls.length;
+    const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
+    const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls).toHaveLength(0);
+    await f.session.logout();
+  });
   it('rewrites a sentence to a ranked title and searches storewide only', async () => {
     const retrieve = {
       rank: (query: string) => query.includes('什么时候')
