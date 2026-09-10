@@ -1,7 +1,7 @@
 # 冻结点：`codex/macos-semantic-query`
 
 > 状态：**本轮收尾冻结**。后续开发从本提交起开新提交，不要在 main 上直接改检索。
-> HEAD：`27b8dab`（收尾审查后若再有冻结说明提交，以当时 `git rev-parse HEAD` 为准）
+> HEAD：`abf75dc`
 > 相对 `origin/main` 的 merge-base：`c4f601e`（#75 之后）
 
 ## 不要做（防版本紊乱）
