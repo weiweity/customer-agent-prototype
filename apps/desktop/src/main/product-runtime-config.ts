@@ -63,6 +63,7 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProduct
     if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) return undefined;
     return Object.freeze({ apiOrigin, identityOrigin });
   } catch {
+    // Missing, unreadable, or non-JSON files take the same fail-closed path.
     return undefined;
   }
 }
