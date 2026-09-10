@@ -8,6 +8,7 @@ import type { AnnounceGate } from '../shared/product-announce';
 import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscalateResult,
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
 import { SYNTHETIC_CATALOG } from '../shared/synthetic-catalog';
+import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
 
 export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
 
@@ -35,6 +36,11 @@ function searchJobs(request: ProductSearchRequest): SearchJob[] {
   return platforms.flatMap((platform) => scopes.map((scope) => ({ platform, ...scope })));
 }
 
+function storewideJobs(request: ProductSearchRequest): SearchJob[] {
+  const platforms: Array<'qianniu' | 'douyin'> = request.platform === 'all' ? ['qianniu', 'douyin'] : [request.platform];
+  return platforms.map((platform) => ({ platform, productContextType: null, productContextRef: null }));
+}
+
 function candidateLive(candidate: ProductCandidate): boolean {
   const now = Date.now();
   return Date.parse(candidate.effective_from) <= now && (candidate.effective_to === null || now < Date.parse(candidate.effective_to))
@@ -57,6 +63,7 @@ export class ProductSearch {
     private readonly writeClipboard: (text: string) => void,
     private readonly announce: AnnounceGate,
     private readonly help: SearchHelp = { openEntry: () => false },
+    private readonly retrieve: SemanticRetriever = loadSemanticRetriever(),
   ) {
     const forget = () => {
       for (const state of this.states.values()) state.controller.abort();
@@ -118,11 +125,13 @@ export class ProductSearch {
       state.productType = request.productContextType;
       state.productRef = request.productContextRef;
       state.unscopedProducts = request.productUnscoped;
-      const jobs = searchJobs(request);
-      const pages = await Promise.all(jobs.map(async (job) => {
+      const rewritten = this.retrieve.rank(request.queryText.trim());
+      const queryTexts = rewritten.length > 0 ? rewritten.map((row) => row.title) : [request.queryText.trim()];
+      const jobs = rewritten.length > 0 ? storewideJobs(request) : searchJobs(request);
+      const pages = await Promise.all(queryTexts.flatMap((queryText) => jobs.map(async (job) => {
         const queryId = randomUUID();
         const { value } = await this.session.request(request.sessionEpoch, '/v1/search', { signal: state.controller.signal, body: {
-          query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: request.queryText.trim(), collection_mode: 'synthetic',
+          query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: queryText, collection_mode: 'synthetic',
           detected_platform: job.platform, platform: job.platform, platform_source: 'manual',
           product_context_type: job.productContextType, product_context_ref: job.productContextRef, top_k: 3,
         } });
@@ -132,8 +141,8 @@ export class ProductSearch {
           || response.candidates.some((candidate) => candidate.release_id !== response.release_id || !matchesJob(candidate, job))) {
           throw new ProductHttpError('VALIDATION');
         }
-        return { queryId, response };
-      }));
+        return { queryId, response, queryText };
+      })));
       const origins = new Map<string, string>();
       const merged: ProductCandidate[] = [];
       for (const page of pages) {

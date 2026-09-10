@@ -105,6 +105,26 @@ describe('product query and native copy provenance', () => {
     expect(isProductSearchRequest({ ...f.request, productContextType: 'sku' })).toBe(false);
     expect(isProductCopyRequest({ ...f.copy, answerText: 'injected' })).toBe(false); await f.session.logout();
   });
+  it('rewrites a sentence to a ranked title and searches storewide only', async () => {
+    const retrieve = {
+      rank: (query: string) => query.includes('什么时候')
+        ? [{ scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title, answerText: candidate.answer_text, score: 0.93 }]
+        : [],
+    };
+    const f = await fixture({ respectJob: true });
+    const search = new ProductSearch(f.session, f.write, f.announce, f.help, retrieve);
+    const result = await search.search(1, {
+      ...f.request, generation: 2, queryText: '什么时候发货呀', platform: 'all', productUnscoped: true,
+    });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
+    const searchBodies = f.transport.mock.calls
+      .filter((call) => String(call[0]).includes('/v1/search'))
+      .map((call) => JSON.parse(String(call[1]?.body)));
+    const rewritten = searchBodies.filter((body) => body.query_text === '合成发货');
+    expect(rewritten.length).toBeGreaterThan(0);
+    expect(rewritten.every((body) => body.product_context_type === null)).toBe(true);
+    await f.session.logout();
+  });
   it('fans out all-platform unscoped search and copies through the originating query', async () => {
     const f = await fixture({ respectJob: true });
     const result = await f.search.search(1, { ...f.request, generation: 2, platform: 'all', productUnscoped: true });
