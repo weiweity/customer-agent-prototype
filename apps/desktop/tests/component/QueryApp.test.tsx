@@ -130,7 +130,8 @@ describe('QueryApp', () => {
       hitStatus: options.noHit ? 'no_hit' as const : 'hit' as const,
       releaseId: 'rel-synthetic', telemetryStatus: 'recorded' as 'recorded' | 'collection_disabled',
       candidates: options.noHit ? [] : [{ rank: 1, release_id: 'rel-synthetic', script_id: 'script-synthetic', script_version: 1,
-        content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale' as const, answer_text: '合成订单 {订单号}', platform_scope: r.platform === 'all' ? ['qianniu', 'douyin'] : [r.platform],
+        content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale' as const, answer_text: '合成订单 {订单号}',
+        platform_scope: (r.platform === 'douyin' ? ['douyin'] : r.platform === 'qianniu' ? ['qianniu'] : ['qianniu', 'douyin']) as Array<'qianniu' | 'douyin'>,
         product_scope_type: 'storewide' as const, product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null,
         intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low' as const, risk_categories: [], has_conflict: false, placeholder_keys: ['order_id' as const] }],
     }));
