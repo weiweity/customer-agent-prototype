@@ -237,6 +237,7 @@ describe('QueryApp', () => {
     f.search.mockClear();
     const pending = deferred<Awaited<ReturnType<typeof f.search>>>(); const response = f.search.getMockImplementation()!;
     f.search.mockImplementationOnce(() => pending.promise); fireEvent.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(f.search).toHaveBeenCalled());
     const request = f.search.mock.calls[0][0];
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '另一个问题' } });
     await act(async () => pending.resolve(await response(request)));

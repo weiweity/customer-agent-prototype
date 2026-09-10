@@ -80,17 +80,26 @@ const api: CustomerAgentApi = {
     async retrievalPreference() {
       try {
         const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
-        return parseRetrievalPreference(value);
+        return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
       } catch {
         return DEFAULT_RETRIEVAL_PREFERENCE;
       }
     },
     async setRetrievalPreference(next) {
+      const parsed = parseRetrievalPreference(next);
+      if (!parsed) {
+        try {
+          const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
+          return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
+        } catch {
+          return DEFAULT_RETRIEVAL_PREFERENCE;
+        }
+      }
       try {
-        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET, parseRetrievalPreference(next));
-        return parseRetrievalPreference(value);
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET, parsed);
+        return parseRetrievalPreference(value) ?? parsed;
       } catch {
-        return DEFAULT_RETRIEVAL_PREFERENCE;
+        return parsed;
       }
     },
   },

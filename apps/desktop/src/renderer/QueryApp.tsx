@@ -119,6 +119,7 @@ export function QueryApp() {
   const composingRef = useRef(false);
   const copyInFlightRef = useRef(false);
   const searchInFlightRef = useRef(false);
+  const preferenceWriteRef = useRef(Promise.resolve());
   const dashboardOpenFailedRef = useRef(false);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
@@ -915,9 +916,9 @@ export function QueryApp() {
       lastProductQueryRef.current = null; setHelpStatus('待核实');
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
-      const search = () => api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
+      const search = () => preferenceWriteRef.current.then(() => api.search({ sessionEpoch, generation, queryText, platform: searchPlatform, platformSource: 'manual',
         productContextType: scope.productContextType, productContextRef: scope.productContextRef,
-        productUnscoped: productType === 'all', parentQueryId: null });
+        productUnscoped: productType === 'all', parentQueryId: null }));
       const run = window.customerAgent.productAnnounce && !announce
         ? refreshAnnounce(sessionEpoch).then(result => { if (!result?.ok || generation !== searchGenerationRef.current) return null; return search(); })
         : search();
@@ -1497,7 +1498,14 @@ export function QueryApp() {
           onToggleSmartRetrieval={() => {
             const next = !smartEnabled;
             setSmartEnabled(next);
-            void window.customerAgent?.productSearch?.setRetrievalPreference?.({ smartEnabled: next });
+            const write = window.customerAgent?.productSearch?.setRetrievalPreference?.({ smartEnabled: next })
+              .then((preference) => {
+                setSmartEnabled(preference.smartEnabled);
+              })
+              .catch(() => {
+                setSmartEnabled(!next);
+              });
+            preferenceWriteRef.current = write ?? Promise.resolve();
           }}
           onSearch={runSearch}
         />

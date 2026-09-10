@@ -6,9 +6,9 @@ export const DEFAULT_RETRIEVAL_PREFERENCE: RetrievalPreference = Object.freeze({
   smartEnabled: true,
 });
 
-export function parseRetrievalPreference(raw: unknown): RetrievalPreference {
-  if (!raw || typeof raw !== 'object') return DEFAULT_RETRIEVAL_PREFERENCE;
+export function parseRetrievalPreference(raw: unknown): RetrievalPreference | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const smartEnabled = Reflect.get(raw, 'smartEnabled');
-  if (typeof smartEnabled !== 'boolean') return DEFAULT_RETRIEVAL_PREFERENCE;
+  if (typeof smartEnabled !== 'boolean') return null;
   return Object.freeze({ smartEnabled });
 }

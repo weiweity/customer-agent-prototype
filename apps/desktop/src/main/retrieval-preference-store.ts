@@ -15,7 +15,7 @@ export function loadRetrievalPreferenceStore(filePath: string): RetrievalPrefere
   const read = (): RetrievalPreference => {
     if (!existsSync(filePath)) return DEFAULT_RETRIEVAL_PREFERENCE;
     try {
-      return parseRetrievalPreference(JSON.parse(readFileSync(filePath, 'utf8')));
+      return parseRetrievalPreference(JSON.parse(readFileSync(filePath, 'utf8'))) ?? DEFAULT_RETRIEVAL_PREFERENCE;
     } catch {
       return DEFAULT_RETRIEVAL_PREFERENCE;
     }

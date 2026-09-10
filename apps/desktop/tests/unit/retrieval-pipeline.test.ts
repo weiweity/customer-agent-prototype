@@ -26,10 +26,12 @@ describe('retrieval pipeline', () => {
   it('uses planned queries then reranks ids only', async () => {
     process.env.MINIMAX_API_KEY = 'test-key';
     try {
+      const prompts: string[] = [];
       const pipeline = createRetrievalPipeline(scripts, {
         fetchImpl: (async (_url, init) => {
           const body = JSON.parse(String((init as RequestInit).body));
           const prompt = String(body.messages?.[1]?.content ?? '');
+          prompts.push(prompt);
           if (prompt.includes('顾客问句：什么时候发货') && !prompt.includes('候选：')) {
             return new Response(JSON.stringify({
               choices: [{ message: { content: '{"intent":"shipping","queries":["发货时效"]}' } }],
@@ -42,6 +44,8 @@ describe('retrieval pipeline', () => {
       });
       const ranked = await pipeline.run('什么时候发货', true);
       expect(ranked.map((row) => row.scriptId)[0]).toBe('ship');
+      expect(prompts.join('\n')).not.toContain('48小时内发出');
+      expect(prompts.join('\n')).not.toContain('仓库正在处理');
     } finally {
       delete process.env.MINIMAX_API_KEY;
     }

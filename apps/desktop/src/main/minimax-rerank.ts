@@ -61,7 +61,7 @@ export function loadMinimaxReranker(options: MinimaxRerankerOptions = {}): Reran
           },
           {
             role: 'user',
-            content: `顾客问句：${query}\n候选：\n${slice.map((row, index) => `${index + 1}. ${row.scriptId} | ${row.title} | ${row.answerText.slice(0, 80)}`).join('\n')}`,
+            content: `顾客问句：${query}\n候选：\n${slice.map((row, index) => `${index + 1}. ${row.scriptId} | ${row.title}`).join('\n')}`,
           },
         ],
         { ...options, maxTokens: 200, timeoutMs: options.timeoutMs ?? 2500 },

@@ -51,7 +51,10 @@ export function registerProductSearchIpc(session: ProductSession | null, announc
     return preferenceStore.read();
   });
   ipcMain.handle(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET, (event, ...args: unknown[]) => {
-    if (!preferenceGuard(event) || args.length !== 1) return DEFAULT_RETRIEVAL_PREFERENCE;
-    return preferenceStore.write(parseRetrievalPreference(args[0]));
+    if (!preferenceGuard(event)) return DEFAULT_RETRIEVAL_PREFERENCE;
+    if (args.length !== 1) return preferenceStore.read();
+    const parsed = parseRetrievalPreference(args[0]);
+    if (!parsed) return preferenceStore.read();
+    return preferenceStore.write(parsed);
   });
 }
