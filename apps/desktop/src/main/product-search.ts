@@ -8,9 +8,14 @@ import type { AnnounceGate } from '../shared/product-announce';
 import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscalateResult,
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
 import { SYNTHETIC_CATALOG } from '../shared/synthetic-catalog';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
 import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
+import { loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
+import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
+import type { RetrievalPreference } from '../shared/retrieval-preference';
 
 export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
 
@@ -68,6 +73,11 @@ export class ProductSearch {
     private readonly retrieve: SemanticRetriever = loadSemanticRetriever(),
     private readonly hydrate: HydrateCatalog | null = loadHydrateCatalog(),
     private readonly rerank: Reranker | null = loadMinimaxReranker(),
+    private readonly pipeline: RetrievalPipeline = loadRetrievalPipeline(),
+    private readonly preference: RetrievalPreferenceStore = loadRetrievalPreferenceStore(
+      process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE
+        ?? join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-preference.json'),
+    ),
   ) {
     const forget = () => {
       for (const state of this.states.values()) state.controller.abort();
@@ -112,6 +122,12 @@ export class ProductSearch {
     try { this.advance(sender, identity); return { ok: true, ...identity, cancelled: true }; }
     catch (error) { return this.failure(error, identity); }
   }
+  retrievalPreference(): RetrievalPreference {
+    return this.preference.read();
+  }
+  setRetrievalPreference(next: RetrievalPreference): RetrievalPreference {
+    return this.preference.write(next);
+  }
   private usable(candidate: ProductCandidate, state: SearchState) {
     const platformOk = state.platform === 'all'
       ? candidate.platform_scope.some((platform) => platform === 'qianniu' || platform === 'douyin')
@@ -129,10 +145,15 @@ export class ProductSearch {
       state.productType = request.productContextType;
       state.productRef = request.productContextRef;
       state.unscopedProducts = request.productUnscoped;
-      const rewritten = this.retrieve.rank(request.queryText.trim());
-      const ranked = this.rerank && rewritten.length > 0
-        ? await this.rerank.rerank(request.queryText.trim(), rewritten)
-        : rewritten;
+      const queryText = request.queryText.trim();
+      const smartEnabled = this.preference.read().smartEnabled;
+      let ranked = await this.pipeline.run(queryText, smartEnabled);
+      if (ranked.length === 0) {
+        const rewritten = this.retrieve.rank(queryText);
+        ranked = smartEnabled && this.rerank && rewritten.length > 0
+          ? await this.rerank.rerank(queryText, rewritten)
+          : rewritten;
+      }
       if (ranked.length > 0 && this.hydrate) {
         const local = this.hydrate.hydrate(ranked).filter((candidate) => this.usable(candidate, state));
         if (local.length > 0) {

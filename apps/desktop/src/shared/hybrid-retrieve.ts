@@ -14,6 +14,7 @@ export type RetrievalScript = Readonly<{
   questionText: string;
   answerText: string;
   category?: string;
+  questions?: readonly string[];
 }>;
 
 export type RankedRetrieval = RetrievalScript & Readonly<{ score: number }>;
@@ -22,6 +23,7 @@ const K1 = 1.2;
 const B = 0.75;
 const RRF_K = 60;
 const DEFAULT_LIMIT = 3;
+export const RETRIEVAL_POOL = 24;
 const TITLE_BOOST = 3;
 const QUESTION_BOOST = 2.5;
 const ANSWER_BOOST = 1;
@@ -78,7 +80,7 @@ export function buildRetrievalIndex(scripts: readonly RetrievalScript[]): Retrie
   const dfAnswer = new Map<string, number>();
   const docs = scripts.map((script) => {
     const title = fieldIndex(script.title);
-    const question = fieldIndex(script.questionText);
+    const question = fieldIndex([script.questionText, ...(script.questions ?? [])].filter((part) => part.length > 0).join(' '));
     const answer = fieldIndex(script.answerText);
     addDf(dfTitle, title);
     addDf(dfQuestion, question);
@@ -184,6 +186,38 @@ export function rankScripts(
   const body = rankedList(queryTerms, index, { title: false, question: false, answer: true });
   const fused = rrf([head, body]);
   const byId = new Map(index.docs.map((doc) => [doc.script.scriptId, doc.script]));
+  const ordered = [...fused.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+  const unique: RankedRetrieval[] = [];
+  const titles = new Set<string>();
+  for (const [scriptId, score] of ordered) {
+    const script = byId.get(scriptId);
+    if (!script || titles.has(script.title)) continue;
+    titles.add(script.title);
+    unique.push(Object.freeze({ ...script, score }));
+    if (unique.length >= limit) break;
+  }
+  return Object.freeze(unique);
+}
+
+export function rankScriptsMulti(
+  queries: readonly string[],
+  scripts: readonly RetrievalScript[],
+  limit = RETRIEVAL_POOL,
+): readonly RankedRetrieval[] {
+  const uniqueQueries = [...new Set(queries.map((item) => item.trim()).filter((item) => item.length > 0))];
+  if (uniqueQueries.length === 0) return Object.freeze([]);
+  if (uniqueQueries.length === 1) return rankScripts(uniqueQueries[0] ?? '', scripts, limit);
+  const rankedLists = uniqueQueries.map((query) => rankScripts(query, scripts, limit));
+  const lists = rankedLists.map((list) => list.map((row, index) => ({
+    scriptId: row.scriptId,
+    rank: index + 1,
+  })));
+  const fused = rrf(lists);
+  const byId = new Map<string, RankedRetrieval>();
+  for (const list of rankedLists) {
+    for (const row of list) if (!byId.has(row.scriptId)) byId.set(row.scriptId, row);
+  }
   const ordered = [...fused.entries()]
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
   const unique: RankedRetrieval[] = [];

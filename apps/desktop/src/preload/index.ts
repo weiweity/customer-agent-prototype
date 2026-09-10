@@ -3,6 +3,7 @@ import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isP
 import { helpFailure, isProductEscalateRequest, isProductEscalateResult, isProductTerminalRequest, isProductTerminalResult } from '../shared/product-help';
 import { catalogFailure, isProductCatalogResult } from '../shared/product-catalog';
 import { exactKeys, isProductSessionResult, productFailure, type ProductSessionResult } from '../shared/product-session';
+import { DEFAULT_RETRIEVAL_PREFERENCE, parseRetrievalPreference } from '../shared/retrieval-preference';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC_CHANNELS,
@@ -76,6 +77,22 @@ const api: CustomerAgentApi = {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
     copyAdopt: request => queryInvoke(IPC_CHANNELS.PRODUCT_COPY_ADOPT, request) as Promise<ProductCopyResult>,
     cancelSearch: request => queryInvoke(IPC_CHANNELS.PRODUCT_CANCEL_SEARCH, request) as Promise<ProductCancelResult>,
+    async retrievalPreference() {
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
+        return parseRetrievalPreference(value);
+      } catch {
+        return DEFAULT_RETRIEVAL_PREFERENCE;
+      }
+    },
+    async setRetrievalPreference(next) {
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET, parseRetrievalPreference(next));
+        return parseRetrievalPreference(value);
+      } catch {
+        return DEFAULT_RETRIEVAL_PREFERENCE;
+      }
+    },
   },
   product: {
     sessionStatus: () => sessionInvoke(IPC_CHANNELS.PRODUCT_SESSION_STATUS),

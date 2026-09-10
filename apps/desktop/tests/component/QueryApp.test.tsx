@@ -136,7 +136,11 @@ describe('QueryApp', () => {
         intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low' as const, risk_categories: [], has_conflict: false, placeholder_keys: ['order_id' as const] }],
     }));
     const copyAdopt = vi.fn(async (r: import('../../src/shared/product-search').ProductCopyRequest) => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, copied: true as const, eventStatus: 'recorded' as const }));
-    window.customerAgent!.productSearch = { search, copyAdopt, cancelSearch: vi.fn(async r => ({ ok: true, ...r, cancelled: true })) };
+    window.customerAgent!.productSearch = {
+      search, copyAdopt, cancelSearch: vi.fn(async r => ({ ok: true, ...r, cancelled: true })),
+      retrievalPreference: vi.fn(async () => ({ smartEnabled: true })),
+      setRetrievalPreference: vi.fn(async (next) => next),
+    };
     const invalidate: Array<(value: { sessionEpoch: number; reason: 'expired' }) => void> = [];
     window.customerAgent!.productAnnounce = {
       refresh: vi.fn(async r => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, releaseId: 'rel-synthetic', releaseSeq: 13,
@@ -684,32 +688,28 @@ describe('QueryApp', () => {
     expect(reportUiPhase).toHaveBeenCalledWith('SEARCH_INPUT', 0);
   });
 
-  it('keeps DeepSeek as an OFF disclosure-only reservation', async () => {
+  it('defaults smart retrieval ON and can turn it off without hiding the input', async () => {
     const user = userEvent.setup();
+    connectProduct();
     render(<QueryApp />);
-    const toggle = screen.getByTestId('deep-thinking-toggle');
+    const toggle = await screen.findByTestId('deep-thinking-toggle');
     reportUiPhase.mockClear();
 
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(toggle).toHaveAttribute('aria-describedby', 'deep-thinking-description');
-    expect(screen.queryByTestId('deep-thinking-panel')).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle).toHaveTextContent('ON');
+    expect(screen.getByTestId('question-input')).toBeInTheDocument();
 
     await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('deep-thinking-panel')).toHaveTextContent('DeepSeek 辅助重排预留');
-    expect(screen.getByTestId('deep-thinking-panel')).toHaveTextContent(
-      '当前 OFF · 未接入 · 不生成 · 不改写 · 不发送',
-    );
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveTextContent('OFF');
+    expect(screen.getByTestId('question-input')).toBeInTheDocument();
+    expect(window.customerAgent?.productSearch?.setRetrievalPreference).toHaveBeenCalledWith({ smartEnabled: false });
     expect(reportUiPhase).not.toHaveBeenCalled();
     expect(copyText).not.toHaveBeenCalled();
     expect(openDashboard).not.toHaveBeenCalled();
-
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByTestId('question-input')).toBeInTheDocument();
   });
 
-  it('keeps the same fixture ranking after opening the DeepSeek reservation note', async () => {
+  it('keeps the same fixture ranking after toggling smart retrieval', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
     await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');

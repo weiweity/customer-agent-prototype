@@ -94,7 +94,7 @@ export function QueryApp() {
   const [handoffFoxTransform, setHandoffFoxTransform] = useState<FoxVisualTransform>(
     IDENTITY_FOX_VISUAL_TRANSFORM,
   );
-  const [deepThinkingInfoOpen, setDeepThinkingInfoOpen] = useState(false);
+  const [smartEnabled, setSmartEnabled] = useState(true);
   const [layoutReady, setLayoutReady] = useState(true);
   const [resizeEdge, setResizeEdge] = useState<QueryResizeEdge>('bottom');
   const [queryHeight, setQueryHeight] = useState(QUERY_INPUT_HEIGHT);
@@ -389,6 +389,9 @@ export function QueryApp() {
       .catch(() => {
         // Click path still works.
       });
+    void api.productSearch?.retrievalPreference?.()
+      .then((preference) => setSmartEnabled(preference.smartEnabled))
+      .catch(() => undefined);
 
     return api.onOverlayCommand((command) => {
       if (command.type === 'prepare-search') {
@@ -430,7 +433,6 @@ export function QueryApp() {
           setResults([]);
           setInvalidMessage('');
           setErrorMessage('');
-          setDeepThinkingInfoOpen(false);
           setLayoutReady(true);
           layoutSequenceRef.current = 0;
           lastAppliedLayoutSequenceRef.current = 0;
@@ -533,7 +535,6 @@ export function QueryApp() {
         setCopying(false);
         setSearching(false);
         setInvalidMessage('');
-        setDeepThinkingInfoOpen(false);
         if (command.animate) {
           collapseCleanupTimerRef.current = window.setTimeout(() => {
             collapseCleanupTimerRef.current = null;
@@ -1473,8 +1474,8 @@ export function QueryApp() {
           ) : null}
           foxVisualState={foxVisualState}
           foxDrag={drag}
-          deepThinkingInfoOpen={deepThinkingInfoOpen}
           deepThinkingDescription={DEEP_THINKING_DESCRIPTION}
+          smartEnabled={smartEnabled}
           query={query}
           inputRef={inputRef}
           invalidMessage={invalidMessage}
@@ -1493,7 +1494,11 @@ export function QueryApp() {
           }}
           onKeyDown={onKeyDown}
           onOpenDashboard={openDashboard}
-          onToggleDeepThinking={() => setDeepThinkingInfoOpen((current) => !current)}
+          onToggleSmartRetrieval={() => {
+            const next = !smartEnabled;
+            setSmartEnabled(next);
+            void window.customerAgent?.productSearch?.setRetrievalPreference?.({ smartEnabled: next });
+          }}
           onSearch={runSearch}
         />
 
