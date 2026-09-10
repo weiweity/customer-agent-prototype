@@ -1,6 +1,6 @@
 # MiniMax 检索管道（源头替换，不是重排补丁）
 
-> 状态：落地中。不改冻结 `judgeSearch`。不生成话术正文。坐席只复制原文。
+> 状态：本轮已冻结，见 `docs/plans/2026-09-10-macos-semantic-query-freeze.md`。不改冻结 `judgeSearch`。不生成话术正文。坐席只复制原文。
 > 开关：查询胶囊「智能检索」，**默认 ON**，可关；失败 fail-open 到本地 BM25。
 
 ## 为什么现方案不是源头
