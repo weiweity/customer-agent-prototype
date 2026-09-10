@@ -1517,7 +1517,7 @@ export function QueryApp() {
           <QueryResultsPane
             contextControls={window.customerAgent?.productSearch && productState?.ok && productState.enabled ? (
               <fieldset aria-label="查询范围" className="product-query-context">
-                <legend>查询范围 · 合成数据</legend>
+                <legend>查询范围</legend>
                 <label>平台 <select aria-label="查询平台" value={searchPlatform} onChange={e => { setSearchPlatform(e.target.value as typeof searchPlatform); cancelPendingSearch(); cancelPendingCopy(); setResults([]); reportPhase('ERROR'); }}>
                   <option value="all">全部平台</option><option value="qianniu">千牛</option><option value="douyin">抖音</option>
                 </select></label>
@@ -1545,8 +1545,8 @@ export function QueryApp() {
                 {catalogStatus !== 'ready' && catalogStatus !== 'loading' && (productType === 'category' || productType === 'sku') ? (
                   <p className="catalog-scope-error" data-testid="catalog-error" role="status">{catalogStatusMessage(catalogStatus)}</p>
                 ) : null}
-                {[...new Set(results.flatMap(r => r.placeholderKeys ?? []))].map(key => <label key={key}>{key === 'order_id' ? '合成订单号' : '日期'}
-                  <input disabled={copying} aria-label={key === 'order_id' ? '合成订单号' : '日期'} value={placeholderValues[key] ?? ''} onChange={e => setPlaceholderValues(v => ({ ...v, [key]: e.target.value }))} />
+                {[...new Set(results.flatMap(r => r.placeholderKeys ?? []))].map(key => <label key={key}>{key === 'order_id' ? '订单号' : '日期'}
+                  <input disabled={copying} aria-label={key === 'order_id' ? '订单号' : '日期'} value={placeholderValues[key] ?? ''} onChange={e => setPlaceholderValues(v => ({ ...v, [key]: e.target.value }))} />
                 </label>)}
               </fieldset>
             ) : undefined}

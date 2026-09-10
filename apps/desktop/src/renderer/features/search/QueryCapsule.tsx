@@ -160,7 +160,6 @@ export function QueryCapsule({
                 <div className="env-badges" data-testid="env-badges">
                   <span className="env-badge">DEMO</span>
                   <span className="env-badge">MOCK AUTH</span>
-                  <span className="env-badge">SYNTHETIC DATA</span>
                 </div>
               </div>
             </div>

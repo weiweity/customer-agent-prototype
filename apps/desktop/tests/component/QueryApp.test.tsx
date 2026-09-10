@@ -248,7 +248,7 @@ describe('QueryApp', () => {
     if (eventStatus === 'disabled') { const response = f.search.getMockImplementation()!; f.search.mockImplementation(async r => ({ ...await response(r), telemetryStatus: 'collection_disabled' })); }
     window.customerAgent!.productSearch!.copyAdopt = vi.fn(async (r: import('../../src/shared/product-search').ProductCopyRequest) => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, copied: true as const, eventStatus }));
     await prepareProductQuery(); await screen.findByTestId('copy-button-1');
-    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-A' } });
+    fireEvent.change(screen.getByLabelText('订单号'), { target: { value: 'SYNTHETIC-A' } });
     fireEvent.click(screen.getByTestId('copy-button-1')); await screen.findByTestId('toast');
     expect(screen.getByTestId('toast')).toHaveTextContent('已复制');
     if (eventStatus === 'unrecorded') expect(screen.getByTestId('toast')).toHaveTextContent('事件未记录');
@@ -274,14 +274,14 @@ describe('QueryApp', () => {
     await screen.findByText('查询服务暂不可用，请重试'); expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
   });
   it('clears old order values on new queries and locks placeholders during copying', async () => {
-    const f = connectProduct(); await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button')); await screen.findByLabelText('合成订单号');
-    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-A' } });
+    const f = connectProduct(); await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button')); await screen.findByLabelText('订单号');
+    fireEvent.change(screen.getByLabelText('订单号'), { target: { value: 'SYNTHETIC-A' } });
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '第二个订单' } }); fireEvent.click(screen.getByTestId('search-button'));
-    expect(await screen.findByLabelText('合成订单号')).toHaveValue('');
-    fireEvent.change(screen.getByLabelText('合成订单号'), { target: { value: 'SYNTHETIC-B' } });
+    expect(await screen.findByLabelText('订单号')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('订单号'), { target: { value: 'SYNTHETIC-B' } });
     const pending = deferred<Awaited<ReturnType<typeof f.copyAdopt>>>(); const response = f.copyAdopt.getMockImplementation()!;
     f.copyAdopt.mockImplementationOnce(() => pending.promise); fireEvent.click(screen.getByTestId('copy-button-1'));
-    expect(screen.getByLabelText('合成订单号')).toBeDisabled();
+    expect(screen.getByLabelText('订单号')).toBeDisabled();
     expect(f.copyAdopt).toHaveBeenCalledWith(expect.objectContaining({ placeholderValues: { order_id: 'SYNTHETIC-B' } }));
     await act(async () => pending.resolve(await response(f.copyAdopt.mock.calls[0][0])));
   });
