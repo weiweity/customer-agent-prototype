@@ -135,11 +135,11 @@ export class ProductSearch {
       state.unscopedProducts = request.productUnscoped;
       const queryText = request.queryText.trim();
       const smartEnabled = this.preference.read().smartEnabled;
-      let ranked = await this.pipeline.run(queryText, smartEnabled);
+      let ranked = await this.pipeline.run(queryText, smartEnabled, state.controller.signal);
       if (ranked.length === 0) {
         const rewritten = this.retrieve.rank(queryText);
         ranked = smartEnabled && this.rerank && rewritten.length > 0
-          ? await this.rerank.rerank(queryText, rewritten)
+          ? await this.rerank.rerank(queryText, rewritten, state.controller.signal)
           : rewritten;
       }
       if (this.hydrate) {
@@ -153,6 +153,9 @@ export class ProductSearch {
         }
         if (!this.announce.allows(this.hydrate.releaseId)) throw new ProductHttpError('STALE');
         return this.finishLocal(sender, state, request, this.hydrate.releaseId, []);
+      }
+      if ((process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim().length > 0) {
+        throw new ProductHttpError('UNAVAILABLE');
       }
       const jobs = searchJobs(request);
       const pages = await Promise.all(jobs.map(async (job) => {

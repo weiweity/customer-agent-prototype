@@ -6,7 +6,7 @@ import type { RankedRetrieval } from '../shared/hybrid-retrieve';
 import { minimaxChatContent, minimaxConfigured, type MinimaxChatOptions } from './minimax-chat';
 
 export type Reranker = Readonly<{
-  rerank(query: string, ranked: readonly RankedRetrieval[]): Promise<readonly RankedRetrieval[]>;
+  rerank(query: string, ranked: readonly RankedRetrieval[], signal?: AbortSignal): Promise<readonly RankedRetrieval[]>;
 }>;
 
 export type MinimaxRerankerOptions = MinimaxChatOptions;
@@ -49,7 +49,7 @@ function mergeOrder(preferred: readonly string[], ranked: readonly RankedRetriev
 export function loadMinimaxReranker(options: MinimaxRerankerOptions = {}): Reranker | null {
   if (!minimaxConfigured()) return null;
   return Object.freeze({
-    async rerank(query: string, ranked: readonly RankedRetrieval[]) {
+    async rerank(query: string, ranked: readonly RankedRetrieval[], signal?: AbortSignal) {
       if (ranked.length <= 1) return ranked;
       const slice = ranked.slice(0, TOP_N);
       const allowed = slice.map((row) => row.scriptId);
@@ -64,7 +64,7 @@ export function loadMinimaxReranker(options: MinimaxRerankerOptions = {}): Reran
             content: `顾客问句：${query}\n候选：\n${slice.map((row, index) => `${index + 1}. ${row.scriptId} | ${row.title}`).join('\n')}`,
           },
         ],
-        { ...options, maxTokens: 200, timeoutMs: options.timeoutMs ?? 2500 },
+        { ...options, maxTokens: 200, timeoutMs: options.timeoutMs ?? 2500, signal },
       );
       if (!content) return ranked;
       const ids = parseRerankIds(content, allowed);

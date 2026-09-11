@@ -11,6 +11,7 @@ export type MinimaxChatOptions = Readonly<{
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   maxTokens?: number;
+  signal?: AbortSignal;
 }>;
 
 function electronFetch(): typeof fetch | null {
@@ -40,6 +41,9 @@ export async function minimaxChatContent(
   if (!options.fetchImpl && !netFetch) console.warn('[minimax-chat] fallback Node fetch');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 2500);
+  const signal = options.signal
+    ? AbortSignal.any([controller.signal, options.signal])
+    : controller.signal;
   try {
     const response = await fetchImpl(`${base}/chat/completions`, {
       method: 'POST',
@@ -52,7 +56,7 @@ export async function minimaxChatContent(
         messages,
       }),
       redirect: 'error',
-      signal: controller.signal,
+      signal,
     });
     if (!response.ok) return null;
     const raw = await response.text();

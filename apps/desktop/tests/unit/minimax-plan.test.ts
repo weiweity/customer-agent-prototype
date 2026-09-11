@@ -22,4 +22,12 @@ describe('minimax query plan parser', () => {
     expect(plan.queries).toEqual(['什么时候发货', '发货时效', '什么时候到']);
     expect(parseQueryPlan('{"intent":"shipping"}', '什么时候发货').queries).toEqual(['什么时候发货']);
   });
+
+  it('keeps a long original customer sentence even when MiniMax returns short queries', () => {
+    const original = `客服你好${'地址填错了麻烦改一下'.repeat(8)}`;
+    expect(original.length).toBeGreaterThan(80);
+    const plan = parseQueryPlan('{"intent":"address","queries":["改地址"]}', original);
+    expect(plan.queries[0]).toBe(original);
+    expect(plan.queries).toEqual([original, '改地址']);
+  });
 });

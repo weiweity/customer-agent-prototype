@@ -10,7 +10,7 @@ import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 import { minimaxConfigured, type MinimaxChatOptions } from './minimax-chat';
 
 export type RetrievalPipeline = Readonly<{
-  run(query: string, smartEnabled: boolean): Promise<readonly RankedRetrieval[]>;
+  run(query: string, smartEnabled: boolean, signal?: AbortSignal): Promise<readonly RankedRetrieval[]>;
 }>;
 
 type IndexFile = Readonly<{
@@ -52,15 +52,15 @@ export function createRetrievalPipeline(
 ): RetrievalPipeline {
   const rerank = options.rerank ?? loadMinimaxReranker(options);
   return Object.freeze({
-    async run(query: string, smartEnabled: boolean) {
+    async run(query: string, smartEnabled: boolean, signal?: AbortSignal) {
       const trimmed = query.trim();
       if (trimmed.length === 0 || scripts.length === 0) return Object.freeze([]);
       const useSmart = smartEnabled && minimaxConfigured();
-      const queries = useSmart ? (await planQuery(trimmed, options)).queries : [trimmed];
+      const queries = useSmart ? (await planQuery(trimmed, { ...options, signal })).queries : [trimmed];
       const pooled = rankScriptsMulti(queries, scripts, RETRIEVAL_POOL);
       if (pooled.length === 0) return Object.freeze([]);
       if (!useSmart || !rerank) return pooled;
-      return rerank.rerank(trimmed, pooled);
+      return rerank.rerank(trimmed, pooled, signal);
     },
   });
 }

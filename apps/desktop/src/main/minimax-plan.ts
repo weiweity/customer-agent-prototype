@@ -23,13 +23,17 @@ export function parseQueryPlan(raw: string, original: string): QueryPlan {
     const queriesRaw = Reflect.get(parsed, 'queries');
     const queries: string[] = [];
     const seen = new Set<string>();
+    const originalQuery = original.trim();
+    if (originalQuery.length > 0) {
+      seen.add(originalQuery);
+      queries.push(originalQuery);
+    }
     const push = (text: string) => {
       const trimmed = text.trim();
       if (trimmed.length < 2 || trimmed.length > 80 || seen.has(trimmed)) return;
       seen.add(trimmed);
       queries.push(trimmed);
     };
-    push(original);
     if (Array.isArray(queriesRaw)) {
       for (const item of queriesRaw) {
         if (typeof item === 'string') push(item);

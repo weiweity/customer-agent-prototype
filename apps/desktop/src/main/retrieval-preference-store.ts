@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
   DEFAULT_RETRIEVAL_PREFERENCE,
@@ -28,7 +28,9 @@ export function loadRetrievalPreferenceStore(filePath: string): RetrievalPrefere
     read,
     write(next: RetrievalPreference) {
       mkdirSync(dirname(filePath), { recursive: true });
-      writeFileSync(filePath, `${JSON.stringify(next)}\n`);
+      const tempPath = `${filePath}.${process.pid}.tmp`;
+      writeFileSync(tempPath, `${JSON.stringify(next)}\n`);
+      renameSync(tempPath, filePath);
       lastGood = next;
       return next;
     },

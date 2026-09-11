@@ -169,7 +169,7 @@ describe('product query and native copy provenance', () => {
     expect(result).toMatchObject({
       ok: true, hitStatus: 'hit', telemetryStatus: 'collection_disabled',
     });
-    expect(pipeline.run).toHaveBeenCalledWith('什么时候发货呀', true);
+    expect(pipeline.run).toHaveBeenCalledWith('什么时候发货呀', true, expect.any(AbortSignal));
     expect(retrieve.rank).not.toHaveBeenCalled();
     expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
     await f.session.logout();
@@ -223,7 +223,7 @@ describe('product query and native copy provenance', () => {
     );
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
     expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
-    expect(pipeline.run).toHaveBeenCalledWith('什么时候发货呀', false);
+    expect(pipeline.run).toHaveBeenCalledWith('什么时候发货呀', false, expect.any(AbortSignal));
     expect(retrieve.rank).toHaveBeenCalledWith('什么时候发货呀');
     expect(rerank.rerank).not.toHaveBeenCalled();
     await f.session.logout();
@@ -299,6 +299,23 @@ describe('product query and native copy provenance', () => {
     expect(result).toMatchObject({ ok: true, hitStatus: 'no_hit', releaseId: candidate.release_id });
     expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
     await f.session.logout();
+  });
+  it('does not call leftover HTTP when hydrate env is set but the snapshot failed to load', async () => {
+    const previous = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+    const f = await fixture();
+    process.env.CUSTOMER_AGENT_HYDRATE_INDEX = '/tmp/missing-hydrate-catalog.json';
+    try {
+      const search = new ProductSearch(
+        f.session, f.write, f.announce, f.help, { rank: () => [] }, null,
+      );
+      const before = f.transport.mock.calls.length;
+      expect(await search.search(1, { ...f.request, generation: 2 })).toMatchObject({ code: 'UNAVAILABLE' });
+      expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+      await f.session.logout();
+    } finally {
+      if (previous === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
+      else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
+    }
   });
   it('returns local no-hit without leftover HTTP when hydrate misses ranked ids', async () => {
     const retrieve = {
