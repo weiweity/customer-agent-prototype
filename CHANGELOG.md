@@ -2,6 +2,25 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.0] - 2026-09-11
+
+### Added
+
+- Query overlay can take a customer sentence and retrieve original scripts via local field-weighted BM25 + RRF (pool 24), then show Top 3 for copy. It does not generate replies.
+- Optional 智能检索, default on: MiniMax plans 1–3 retrieval queries and reranks existing script ids only. Timeout or error falls back to BM25.
+
+### Changed
+
+- After a successful copy the overlay yields focus so the agent can paste immediately; search defaults to unscoped products.
+- Live script cards no longer show `DEMO · 合成数据`. Identity chrome is still synthetic login / MOCK AUTH.
+- When a local hydrate snapshot is loaded, search no longer calls leftover `/v1/search`.
+
+### Fixed
+
+- MiniMax calls go through Electron `net.fetch` so corporate TLS no longer fail-opens every smart search.
+- Hydrate rows must match the copy contract (`content_hash` 64 hex, non-empty answer). Cancelled searches no longer commit. Long customer sentences stay in the MiniMax plan.
+- The retrieval toggle is visually separate from 合成登录, cancels an in-flight search when flipped, and keeps the last good OFF value if the preference file is corrupt.
+
 ## [Unreleased]
 
 - Recorded D0–D5 closeout status, user-reported synthetic observation boundaries, and a DRAFT Windows installer/device-verification plan. This is documentation only: not a Windows implementation, install acceptance, or deployment.
@@ -18,6 +37,10 @@ All notable changes to this customer-agent product implementation repository are
 - Reused builds within each verification and packaging command while retaining clean formal-candidate builds, fresh tests and artifact hash checks.
 
 ### Fixed
+
+- Kept announce invalid-lease denials at 403 when the denial audit can be written: snapshot/current now release the request client before opening the audit connection, destroy broken pooled clients, retry a failed audit BEGIN once, retry a snapshot read once after a connection or query-timeout error, keep ZA004 even when a driver `cause` has no SQLSTATE, and stop rewriting connection errors as `OFFLINE_LEASE_INVALID`. Unaudited denials still fail closed as 503.
+- Stopped the runtime pool late-connect guard from destroying idle clients older than `connectionTimeoutMs`, so checkout reuse is no longer treated as a hung connect.
+- Printed G1A E0 failing test names before deleting the CI JSON report, and isolated that job's temporary PostgreSQL roots from leftover `/tmp` directories.
 
 - Suppressed unresolved support references before candidate matching, while preserving concrete product, symptom and action queries and the existing source readiness checks.
 
