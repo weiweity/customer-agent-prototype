@@ -126,7 +126,7 @@ describe('product query and native copy provenance', () => {
     expect(searchCalls).toHaveLength(0);
     await f.session.logout();
   });
-  it('rewrites a sentence to a ranked title and searches storewide only', async () => {
+  it('does not send a ranked title to leftover /v1/search when hydrate is missing', async () => {
     const retrieve = {
       rank: (query: string) => query.includes('什么时候')
         ? [{ scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title, answerText: candidate.answer_text, score: 0.93 }]
@@ -134,16 +134,38 @@ describe('product query and native copy provenance', () => {
     };
     const f = await fixture({ respectJob: true });
     const search = new ProductSearch(f.session, f.write, f.announce, f.help, retrieve);
+    const before = f.transport.mock.calls.length;
     const result = await search.search(1, {
       ...f.request, generation: 2, queryText: '什么时候发货呀', platform: 'all', productUnscoped: true,
     });
-    expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
+    expect(result).toMatchObject({ ok: true });
     const searchBodies = f.transport.mock.calls
+      .slice(before)
       .filter((call) => String(call[0]).includes('/v1/search'))
       .map((call) => JSON.parse(String(call[1]?.body)));
-    const rewritten = searchBodies.filter((body) => body.query_text === '合成发货');
-    expect(rewritten.length).toBeGreaterThan(0);
-    expect(rewritten.every((body) => body.product_context_type === null)).toBe(true);
+    expect(searchBodies.every((body) => body.query_text === '什么时候发货呀')).toBe(true);
+    expect(searchBodies.some((body) => body.query_text === '合成发货')).toBe(false);
+    await f.session.logout();
+  });
+  it('returns local no-hit without leftover HTTP when hydrate misses ranked ids', async () => {
+    const retrieve = {
+      rank: () => [{
+        scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
+        answerText: candidate.answer_text, score: 1,
+      }],
+    };
+    const hydrate = {
+      releaseId: candidate.release_id,
+      candidate: () => null,
+      hydrate: () => [],
+    };
+    const f = await fixture();
+    const search = new ProductSearch(f.session, f.write, f.announce, f.help, retrieve, hydrate);
+    const before = f.transport.mock.calls.length;
+    const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'no_hit', releaseId: candidate.release_id });
+    const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls).toHaveLength(0);
     await f.session.logout();
   });
   it('fans out all-platform unscoped search and copies through the originating query', async () => {

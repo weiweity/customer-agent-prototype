@@ -43,11 +43,6 @@ function searchJobs(request: ProductSearchRequest): SearchJob[] {
   return platforms.flatMap((platform) => scopes.map((scope) => ({ platform, ...scope })));
 }
 
-function storewideJobs(request: ProductSearchRequest): SearchJob[] {
-  const platforms: Array<'qianniu' | 'douyin'> = request.platform === 'all' ? ['qianniu', 'douyin'] : [request.platform];
-  return platforms.map((platform) => ({ platform, productContextType: null, productContextRef: null }));
-}
-
 function candidateLive(candidate: ProductCandidate): boolean {
   const now = Date.now();
   return Date.parse(candidate.effective_from) <= now && (candidate.effective_to === null || now < Date.parse(candidate.effective_to))
@@ -154,24 +149,17 @@ export class ProductSearch {
           ? await this.rerank.rerank(queryText, rewritten)
           : rewritten;
       }
-      if (ranked.length > 0 && this.hydrate) {
+      if (this.hydrate) {
         const local = this.hydrate.hydrate(ranked).filter((candidate) => this.usable(candidate, state));
         if (local.length > 0) {
           if (!this.announce.allows(local[0]!.release_id)) throw new ProductHttpError('STALE');
-          const queryId = randomUUID();
-          const origins = new Map(local.map((candidate) => [candidate.script_id, queryId]));
-          const result: Extract<ProductSearchResult, { ok: true }> = {
-            ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
-            queryId, hitStatus: 'hit', releaseId: local[0]!.release_id,
-            telemetryStatus: 'collection_disabled', candidates: local,
-          };
-          state.origins = origins;
-          state.result = structuredClone(result); this.last.set(sender, state); return result;
+          return this.finishLocal(sender, state, request, local[0]!.release_id, local);
         }
+        if (!this.announce.allows(this.hydrate.releaseId)) throw new ProductHttpError('STALE');
+        return this.finishLocal(sender, state, request, this.hydrate.releaseId, []);
       }
-      const queryTexts = ranked.length > 0 ? ranked.slice(0, 1).map((row) => row.title) : [request.queryText.trim()];
-      const jobs = ranked.length > 0 ? storewideJobs(request).slice(0, 1) : searchJobs(request);
-      const pages = await Promise.all(queryTexts.flatMap((queryText) => jobs.map(async (job) => {
+      const jobs = searchJobs(request);
+      const pages = await Promise.all(jobs.map(async (job) => {
         const queryId = randomUUID();
         const { value } = await this.session.request(request.sessionEpoch, '/v1/search', { signal: state.controller.signal, body: {
           query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: queryText, collection_mode: 'synthetic',
@@ -185,7 +173,7 @@ export class ProductSearch {
           throw new ProductHttpError('VALIDATION');
         }
         return { queryId, response, queryText };
-      })));
+      }));
       const origins = new Map<string, string>();
       const merged: ProductCandidate[] = [];
       for (const page of pages) {
@@ -210,6 +198,25 @@ export class ProductSearch {
       state.origins = origins;
       state.result = structuredClone(result); this.last.set(sender, state); return result;
     } catch (error) { return this.failure(error, request); }
+  }
+  private finishLocal(
+    sender: number,
+    state: SearchState,
+    request: ProductSearchRequest,
+    releaseId: string,
+    candidates: ProductCandidate[],
+  ): Extract<ProductSearchResult, { ok: true }> {
+    const queryId = randomUUID();
+    const origins = new Map(candidates.map((candidate) => [candidate.script_id, queryId]));
+    const result: Extract<ProductSearchResult, { ok: true }> = {
+      ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
+      queryId, hitStatus: candidates.length > 0 ? 'hit' : 'no_hit', releaseId,
+      telemetryStatus: 'collection_disabled', candidates,
+    };
+    state.origins = origins;
+    state.result = structuredClone(result);
+    this.last.set(sender, state);
+    return result;
   }
   async copy(sender: number, request: ProductCopyRequest): Promise<ProductCopyResult> {
     let state: SearchState | undefined; let acquired = false;

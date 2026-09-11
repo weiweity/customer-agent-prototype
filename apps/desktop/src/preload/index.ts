@@ -97,9 +97,14 @@ const api: CustomerAgentApi = {
       }
       try {
         const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET, parsed);
-        return parseRetrievalPreference(value) ?? parsed;
+        return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
       } catch {
-        return parsed;
+        try {
+          const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
+          return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
+        } catch {
+          return DEFAULT_RETRIEVAL_PREFERENCE;
+        }
       }
     },
   },
