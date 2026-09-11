@@ -19,7 +19,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ### Fixed
 
-- Kept announce invalid-lease denials at 403 when the denial audit can be written: snapshot/current now release the request client before opening the audit connection, destroy broken pooled clients, retry a failed audit BEGIN once, and stop rewriting connection errors as `OFFLINE_LEASE_INVALID`. Unaudited denials still fail closed as 503.
+- Kept announce invalid-lease denials at 403 when the denial audit can be written: snapshot/current now release the request client before opening the audit connection, destroy broken pooled clients, retry a failed audit BEGIN once, retry a snapshot read once after a connection or query-timeout error, keep ZA004 even when a driver `cause` has no SQLSTATE, and stop rewriting connection errors as `OFFLINE_LEASE_INVALID`. Unaudited denials still fail closed as 503.
 - Stopped the runtime pool late-connect guard from destroying idle clients older than `connectionTimeoutMs`, so checkout reuse is no longer treated as a hung connect.
 - Printed G1A E0 failing test names before deleting the CI JSON report, and isolated that job's temporary PostgreSQL roots from leftover `/tmp` directories.
 
