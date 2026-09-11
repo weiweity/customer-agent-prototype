@@ -51,6 +51,17 @@ describe('hydrate catalog parser', () => {
     });
   });
 
+  it('keeps an empty catalog when the snapshot parses but no row is valid', () => {
+    const catalog = loadHydrateCatalog(writeIndex({
+      releaseId: 'rel-synthetic-001',
+      scripts: [{ scriptId: 'bad', category: 'not-a-category' }],
+    }));
+    expect(catalog?.releaseId).toBe('rel-synthetic-001');
+    expect(catalog?.hydrate([{
+      scriptId: 'bad', title: 'x', questionText: '', answerText: '', score: 1,
+    }])).toEqual([]);
+  });
+
   it('skips rows whose unions do not match the search candidate contract', () => {
     const catalog = loadHydrateCatalog(writeIndex({
       releaseId: 'rel-synthetic-001',

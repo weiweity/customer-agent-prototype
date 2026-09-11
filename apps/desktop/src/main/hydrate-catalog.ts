@@ -161,7 +161,6 @@ export function loadHydrateCatalog(indexPath = process.env.CUSTOMER_AGENT_HYDRAT
       if (!row) continue;
       byId.set(row.scriptId, row);
     }
-    if (byId.size === 0) return null;
     return Object.freeze({
       releaseId,
       candidate(scriptId: string) {
