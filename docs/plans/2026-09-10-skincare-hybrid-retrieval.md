@@ -1,6 +1,6 @@
 # 护肤品客服话术检索：并行落地计划
 
-> 状态：执行中 · 本机受控演示。不改冻结 `judgeSearch`，不把客户原文提交进 Git。
+> 状态：本轮已冻结，见 `docs/plans/2026-09-10-macos-semantic-query-freeze.md`。不改冻结 `judgeSearch`，不把客户原文提交进 Git。水合走仓外 hydrate 快照，不再用 `/v1/search` 换标题。
 > 产品形状：坐席看到**原文候选**并复制，不生成话术。
 
 ## 为什么大改而不是补丁

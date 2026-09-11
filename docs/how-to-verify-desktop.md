@@ -36,7 +36,7 @@ pnpm -v    # 项目锁定 11.19.0
 | W4 database 全门禁 | `pnpm test:db` | 不涉及桌面拖拽 | 否 | 会构建 database package，并启动一次性 PG15 cluster |
 | 全量 Electron Playwright | `pnpm test:e2e` | 含浮窗与 Dashboard smoke，仍不是真实设备门禁 | 否 | **是** |
 | 本机未签名 macOS 证明包 | `pnpm package:mac:local` | 否 | 会先 `generate:app-icons` | 会先 `pnpm build:services` 再桌面 `pnpm build` |
-| 本机合成栈（M1） | `node scripts/synthetic-stack/stack.ts start` | 否 | 否 | 需要先 `pnpm build:services` |
+| 本机合成栈（M1） | `node scripts/synthetic-stack/stack.ts start` | 否 | 否 | 需要先 `pnpm build:services`。**若当前已是 `rel_6` MENOKIN，不要 start**，见 [检索浮窗](how-to-run-macos-semantic-query.md) |
 | 正式 macOS 外发门禁 | `pnpm package:mac` | 否 | 同上 | 同上，但当前会因 Demo `appId` fail-closed |
 | 本机未签名 Windows 证明包 | `pnpm package:win` | 否 | 会先生成 ICO | 会先 electron-vite build |
 
@@ -296,6 +296,8 @@ Query 的「合成登录」经过独立受控登录窗，返回后显示角色�
 ## 本机合成栈（M1）
 
 `scripts/synthetic-stack/stack.ts` 启动一套属于本任务的本机合成环境：私有 PostgreSQL 15 cluster（仅 Unix socket，无 TCP 监听）、合成身份提供方、API、worker，并把合成话术通过真实的导入→worker→审核→发布链写入。
+
+**`start` 会播种。** 当前本机若已经发布 `rel_6` MENOKIN 话术，不要再 `start`：它会写成合成种子 `rel_7`，桌面 hydrate 对不上就会「内容已变化」。已有栈只 `status` / `stop`；检索开发见 [How to 启动检索浮窗](how-to-run-macos-semantic-query.md)。API 进程必须是 `apps/api/dist/main.js`。
 
 ```bash
 node scripts/synthetic-stack/stack.ts start     # 准备 + 启动 + 播种 + 自检

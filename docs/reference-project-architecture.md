@@ -24,7 +24,7 @@
 │ renderer                                                       │
 │  App.tsx 按 WindowRole 分发                                     │
 │   ├─ FoxApp       浮窗、拖拽、贴边、睡眠与交接                   │
-│   ├─ QueryApp     查询胶囊、本地合成检索、Top 3、复制            │
+│   ├─ QueryApp     查询胶囊、BM25/hydrate Top 3、复制            │
 │   └─ DashboardApp 静态合成工作台、主题与导航                      │
 └────────────────────────────────────────────────────────────────┘
                 │
@@ -53,7 +53,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
                                       └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链仍是：狐狸浮窗打开查询 → Query 在本地合成 fixture 中检索 → 人工选择 Top 3 → 通过白名单 IPC 写入剪贴板。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告与导入审核发布，但当前只放行 synthetic；显式接入 profile 下 D1–D5 桌面 adapter 已接线，方案为 APPROVED 且工程已合并。真实内容和正式飞书身份仍未接通。
+桌面主链：狐狸浮窗打开查询 → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard 读取编译期的 `DASHBOARD_MANIFEST`，不读取 Query、不写数据库，也不调用 Application API。并行 API 已接通本机产品合成身份、策略、受控 SearchBackend、Search + Events、公告与导入审核发布，但当前只放行 synthetic；显式接入 profile 下 D1–D5 桌面 adapter 已接线。真实内容和正式飞书身份仍未接通。
 
 ## 2. 目录归属
 
