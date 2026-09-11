@@ -150,6 +150,22 @@ function sqlStateOf(error: unknown): string {
   return /^[0-9A-Z]{5}$/.test(state) ? state : '';
 }
 
+function isBrokenClient(error: unknown): boolean {
+  const state = sqlStateOf(error);
+  if (state.startsWith('08') || state === '57P01' || state === '57P02' || state === '57P03') {
+    return true;
+  }
+  const code = fieldOf(error, 'code');
+  if (code.startsWith('ECONN') || code === 'ETIMEDOUT' || code === 'ENOTFOUND' || code === 'EPIPE') {
+    return true;
+  }
+  const message = (error instanceof Error ? error.message : fieldOf(error, 'message')).toLowerCase();
+  return message.includes('timeout')
+    || message.includes('deadline')
+    || message.includes('terminated')
+    || message.includes('hang up');
+}
+
 function contractReason(error: unknown): string {
   const detail = fieldOf(error, 'detail');
   if (LEASE_REASONS.has(detail)
@@ -338,45 +354,49 @@ export function createAnnounceServiceForPool(
       logHash.version,
       logHash.key,
     );
-    const client = await pool.connect().catch((error: unknown) => {
-      report(error, 'ANNOUNCE_AUDIT_CONNECT_FAILED');
-      return null;
-    });
-    if (client === null) return false;
-    let broken = false;
-    let failureCode: ApiRuntimeDiagnosticCode = 'ANNOUNCE_AUDIT_BEGIN_FAILED';
-    try {
-      await client.query('BEGIN');
-      failureCode = 'ANNOUNCE_AUDIT_WRITE_FAILED';
-      await client.query(
-        `SELECT public.record_runtime_source_denial_audit($1,$2,$3,$4,$5,$6,$7,NULL,$8,$9)`,
-        [
-          `sda_${denialDigest}`,
-          operation,
-          reason,
-          actorSubjectHash,
-          logHash.version,
-          actor.role,
-          releaseId,
-          sourceBindingHash,
-          `diag_${diagnosticDigest.slice(0, 32)}`,
-        ],
-      );
-      failureCode = 'ANNOUNCE_AUDIT_COMMIT_FAILED';
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      report(error, failureCode);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const client = await pool.connect().catch((error: unknown) => {
+        report(error, 'ANNOUNCE_AUDIT_CONNECT_FAILED');
+        return null;
+      });
+      if (client === null) continue;
+      let broken = false;
+      let failureCode: ApiRuntimeDiagnosticCode = 'ANNOUNCE_AUDIT_BEGIN_FAILED';
       try {
-        await client.query('ROLLBACK');
-      } catch (rollbackError) {
-        broken = true;
-        report(rollbackError, 'ANNOUNCE_AUDIT_ROLLBACK_FAILED');
+        await client.query('BEGIN');
+        failureCode = 'ANNOUNCE_AUDIT_WRITE_FAILED';
+        await client.query(
+          `SELECT public.record_runtime_source_denial_audit($1,$2,$3,$4,$5,$6,$7,NULL,$8,$9)`,
+          [
+            `sda_${denialDigest}`,
+            operation,
+            reason,
+            actorSubjectHash,
+            logHash.version,
+            actor.role,
+            releaseId,
+            sourceBindingHash,
+            `diag_${diagnosticDigest.slice(0, 32)}`,
+          ],
+        );
+        failureCode = 'ANNOUNCE_AUDIT_COMMIT_FAILED';
+        await client.query('COMMIT');
+        return true;
+      } catch (error) {
+        report(error, failureCode);
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          broken = true;
+          report(rollbackError, 'ANNOUNCE_AUDIT_ROLLBACK_FAILED');
+        }
+        if (failureCode === 'ANNOUNCE_AUDIT_BEGIN_FAILED') broken = true;
+        else return false;
+      } finally {
+        client.release(broken);
       }
-      return false;
-    } finally {
-      client.release(broken);
     }
+    return false;
   }
 
   async function deny(
@@ -408,6 +428,8 @@ export function createAnnounceServiceForPool(
         return null;
       });
       if (client === null) return failure('OVERLOADED');
+      let broken = false;
+      let denied: AnnounceFailure | undefined;
       try {
         const result = await client.query<CurrentRow>(
           'SELECT * FROM public.read_current_announcement_with_lease($1,$2,$3)',
@@ -415,50 +437,53 @@ export function createAnnounceServiceForPool(
         );
         const row = result.rows[0];
         if (row === undefined) {
-          return deny(
-            'announce_current',
-            request.actor,
-            failure('SOURCE_GATE_NOT_READY', 'SOURCE_GATE_NOT_READY'),
-            request.clientId,
-            null,
-            null,
-          );
-        }
-        const response = mapCurrent(row);
-        const etag = weakEtag(response.release_seq);
-        if (request.ifNoneMatch === etag && request.leaseToken !== undefined) {
-          try {
-            const lease = await client.query<LeaseRow>(
-              'SELECT * FROM public.validate_snapshot_offline_lease($1,$2,$3,$4)',
-              [request.leaseToken, request.clientId, request.actor.user_id, response.current_release_id],
-            );
-            const valid = lease.rows[0];
-            if (valid !== undefined && Number(valid.release_seq) === response.release_seq) {
-              return Object.freeze({
-                ok: true as const,
-                status: 304 as const,
-                etag,
-                leaseToken: request.leaseToken,
-                leaseExpiresAt: asIso(valid.lease_expires_at),
-              });
+          denied = failure('SOURCE_GATE_NOT_READY', 'SOURCE_GATE_NOT_READY');
+        } else {
+          const response = mapCurrent(row);
+          const etag = weakEtag(response.release_seq);
+          if (request.ifNoneMatch === etag && request.leaseToken !== undefined) {
+            try {
+              const lease = await client.query<LeaseRow>(
+                'SELECT * FROM public.validate_snapshot_offline_lease($1,$2,$3,$4)',
+                [request.leaseToken, request.clientId, request.actor.user_id, response.current_release_id],
+              );
+              const valid = lease.rows[0];
+              if (valid !== undefined && Number(valid.release_seq) === response.release_seq) {
+                return Object.freeze({
+                  ok: true as const,
+                  status: 304 as const,
+                  etag,
+                  leaseToken: request.leaseToken,
+                  leaseExpiresAt: asIso(valid.lease_expires_at),
+                });
+              }
+            } catch {
+              // Stale or invalid conditional lease falls through to a fresh 200.
             }
-          } catch {
-            // Stale or invalid conditional lease falls through to a fresh 200.
           }
+          return Object.freeze({ ok: true as const, status: 200 as const, response, etag });
         }
-        return Object.freeze({ ok: true as const, status: 200 as const, response, etag });
       } catch (error) {
-        return deny(
-          'announce_current',
-          request.actor,
-          announceFailure(error, 'announce_current'),
-          request.clientId,
-          null,
-          null,
-        );
+        broken = isBrokenClient(error);
+        const mapped = announceFailure(error, 'announce_current');
+        if (mapped.reason !== undefined && CURRENT_AUDITED.has(mapped.reason)) {
+          denied = mapped;
+        } else {
+          if (mapped.code === 'INTERNAL') report(error);
+          return mapped;
+        }
       } finally {
-        client.release(false);
+        client.release(broken);
       }
+      if (denied === undefined) return failure('INTERNAL');
+      return deny(
+        'announce_current',
+        request.actor,
+        denied,
+        request.clientId,
+        null,
+        null,
+      );
     },
 
     async snapshot(request) {
@@ -467,64 +492,54 @@ export function createAnnounceServiceForPool(
         return null;
       });
       if (client === null) return failure('OVERLOADED');
+      let broken = false;
+      let denied: AnnounceFailure | undefined;
       try {
-        let result;
-        try {
-          result = await client.query<SnapshotRow>(
-            'SELECT * FROM public.read_snapshot_page($1,$2,$3,$4,$5,$6)',
-            [
-              request.leaseToken,
-              request.clientId,
-              request.actor.user_id,
-              request.releaseId,
-              request.cursor,
-              request.limit,
-            ],
-          );
-        } catch (error) {
-          let mapped = announceFailure(error, 'announce_snapshot');
-          if (mapped.code === 'INTERNAL') {
-            report(error);
-            mapped = failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID');
-          }
-          return deny(
-            'announce_snapshot',
-            request.actor,
-            mapped,
-            `${request.clientId}:${request.releaseId}`,
+        const result = await client.query<SnapshotRow>(
+          'SELECT * FROM public.read_snapshot_page($1,$2,$3,$4,$5,$6)',
+          [
+            request.leaseToken,
+            request.clientId,
+            request.actor.user_id,
             request.releaseId,
-            null,
-          );
-        }
+            request.cursor,
+            request.limit,
+          ],
+        );
         const row = result.rows[0];
         if (row === undefined) return failure('NOT_FOUND');
         if (row.lease_expires_at === null || row.lease_expires_at === undefined
           || row.release_id === undefined || row.release_id === null) {
-          return deny(
-            'announce_snapshot',
-            request.actor,
-            failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID'),
-            `${request.clientId}:${request.releaseId}`,
-            request.releaseId,
-            null,
-          );
+          denied = failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID');
+        } else {
+          try {
+            return Object.freeze({ ok: true as const, response: mapSnapshot(row, request.leaseToken) });
+          } catch (error) {
+            report(error);
+            denied = failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID');
+          }
         }
-        try {
-          return Object.freeze({ ok: true as const, response: mapSnapshot(row, request.leaseToken) });
-        } catch (error) {
-          report(error);
-          return deny(
-            'announce_snapshot',
-            request.actor,
-            failure('FORBIDDEN', 'OFFLINE_LEASE_INVALID'),
-            `${request.clientId}:${request.releaseId}`,
-            request.releaseId,
-            null,
-          );
+      } catch (error) {
+        const mapped = announceFailure(error, 'announce_snapshot');
+        broken = isBrokenClient(error) || mapped.code === 'INTERNAL' || mapped.code === 'OVERLOADED';
+        if (mapped.reason !== undefined && SNAPSHOT_AUDITED.has(mapped.reason)) {
+          denied = mapped;
+        } else {
+          if (mapped.code === 'INTERNAL') report(error);
+          return mapped;
         }
       } finally {
-        client.release(false);
+        client.release(broken);
       }
+      if (denied === undefined) return failure('INTERNAL');
+      return deny(
+        'announce_snapshot',
+        request.actor,
+        denied,
+        `${request.clientId}:${request.releaseId}`,
+        request.releaseId,
+        null,
+      );
     },
 
     async ack(request) {
