@@ -33,8 +33,11 @@ export async function minimaxChatContent(
   const apiKey = process.env.MINIMAX_API_KEY?.trim();
   if (!apiKey) return null;
   const base = (process.env.MINIMAX_BASE_URL?.trim() || DEFAULT_BASE).replace(/\/$/, '');
+  if (!base.startsWith('https://')) return null;
   const model = process.env.MINIMAX_MODEL?.trim() || DEFAULT_MODEL;
-  const fetchImpl = options.fetchImpl ?? electronFetch() ?? fetch;
+  const netFetch = electronFetch();
+  const fetchImpl = options.fetchImpl ?? netFetch ?? fetch;
+  if (!options.fetchImpl && !netFetch) console.warn('[minimax-chat] fallback Node fetch');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 2500);
   try {
@@ -48,10 +51,13 @@ export async function minimaxChatContent(
         thinking: { type: 'disabled' },
         messages,
       }),
+      redirect: 'error',
       signal: controller.signal,
     });
     if (!response.ok) return null;
-    const body: unknown = await response.json().catch(() => ({}));
+    const raw = await response.text();
+    if (raw.length > 1_048_576) return null;
+    const body: unknown = JSON.parse(raw);
     const content = (body as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content;
     return typeof content === 'string' && content.trim().length > 0 ? content : null;
   } catch (error) {

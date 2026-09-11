@@ -710,6 +710,66 @@ describe('QueryApp', () => {
     expect(openDashboard).not.toHaveBeenCalled();
   });
 
+  it('does not show DEMO · 合成数据 on live script cards', async () => {
+    const f = connectProduct();
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('copy-button-1');
+    expect(screen.queryByText('DEMO · 合成数据')).not.toBeInTheDocument();
+    expect(screen.getByTestId('env-badges')).toHaveTextContent('DEMO');
+    expect(f.search).toHaveBeenCalled();
+  });
+
+  it('loads persisted smart retrieval OFF and reverts if the write fails', async () => {
+    connectProduct();
+    window.customerAgent!.productSearch!.retrievalPreference = vi.fn(async () => ({ smartEnabled: false }));
+    window.customerAgent!.productSearch!.setRetrievalPreference = vi.fn(async () => {
+      throw new Error('preference write failed');
+    });
+    render(<QueryApp />);
+    const toggle = await screen.findByTestId('deep-thinking-toggle');
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+    expect(toggle).toHaveTextContent('OFF');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+  });
+
+  it('cancels an in-flight search when smart retrieval is toggled', async () => {
+    const f = connectProduct();
+    const pending = deferred<Awaited<ReturnType<typeof f.search>>>();
+    f.search.mockImplementationOnce(() => pending.promise);
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByTestId('announce-banner');
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(f.search).toHaveBeenCalled());
+    const cancelSearch = window.customerAgent!.productSearch!.cancelSearch as ReturnType<typeof vi.fn>;
+    cancelSearch.mockClear();
+    fireEvent.click(screen.getByTestId('deep-thinking-toggle'));
+    expect(cancelSearch).toHaveBeenCalled();
+    pending.resolve({
+      ok: true, sessionEpoch: 10, generation: 1, queryId: '11111111-1111-4111-8111-111111111111',
+      hitStatus: 'hit', releaseId: 'rel-synthetic', telemetryStatus: 'recorded', candidates: [],
+    });
+  });
+
+  it('waits for the retrieval preference write before searching', async () => {
+    const f = connectProduct();
+    const pending = deferred<{ smartEnabled: boolean }>();
+    window.customerAgent!.productSearch!.setRetrievalPreference = vi.fn(() => pending.promise);
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    await screen.findByTestId('announce-banner');
+    fireEvent.click(screen.getByTestId('deep-thinking-toggle'));
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(f.search).not.toHaveBeenCalled();
+    await act(async () => pending.resolve({ smartEnabled: false }));
+    await waitFor(() => expect(f.search).toHaveBeenCalled());
+  });
+
   it('keeps the same fixture ranking after toggling smart retrieval', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);

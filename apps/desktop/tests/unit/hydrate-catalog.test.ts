@@ -73,4 +73,41 @@ describe('hydrate catalog parser', () => {
     expect(catalog?.candidate('script-synthetic-001')).toBeNull();
     expect(catalog?.candidate('ok')?.script_id).toBe('ok');
   });
+
+  it('returns null for missing or invalid snapshots and hydrates every ranked match', () => {
+    expect(loadHydrateCatalog('')).toBeNull();
+    expect(loadHydrateCatalog(join(tmpdir(), 'hydrate-missing.json'))).toBeNull();
+    const invalid = writeIndex({ scripts: [] });
+    writeFileSync(invalid, '{not json');
+    expect(loadHydrateCatalog(invalid)).toBeNull();
+    expect(loadHydrateCatalog(writeIndex({ scripts: valid.scripts }))).toBeNull();
+    const catalog = loadHydrateCatalog(writeIndex({
+      releaseId: 'rel-synthetic-001',
+      scripts: [1, 2, 3, 4].map((index) => ({
+        ...valid.scripts[0],
+        scriptId: `script-synthetic-00${index}`,
+      })),
+    }));
+    const hydrated = catalog?.hydrate([1, 2, 3, 4].map((index) => ({
+      scriptId: `script-synthetic-00${index}`, title: '合成发货', questionText: '', answerText: '', score: 4 - index,
+    })) ) ?? [];
+    expect(hydrated.map((row) => row.script_id)).toEqual([
+      'script-synthetic-001', 'script-synthetic-002', 'script-synthetic-003', 'script-synthetic-004',
+    ]);
+  });
+
+  it('drops rows whose content hash or answer text fail the copy contract', () => {
+    const catalog = loadHydrateCatalog(writeIndex({
+      releaseId: 'rel-synthetic-001',
+      scripts: [
+        { ...valid.scripts[0], scriptId: 'bad-hash', contentHash: 'not-a-hash' },
+        { ...valid.scripts[0], scriptId: 'empty-answer', answerText: '   ' },
+        { ...valid.scripts[0], scriptId: 'ok' },
+      ],
+    }));
+    expect(catalog?.releaseId).toBe('rel-synthetic-001');
+    expect(catalog?.candidate('bad-hash')).toBeNull();
+    expect(catalog?.candidate('empty-answer')).toBeNull();
+    expect(catalog?.candidate('ok')?.script_id).toBe('ok');
+  });
 });

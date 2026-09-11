@@ -1468,7 +1468,7 @@ export function QueryApp() {
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
           productControl={window.customerAgent?.product && !(productState?.ok && !productState.enabled) ? (
-            <button type="button" className="deep-thinking-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
+            <button type="button" className="capsule-session-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
               title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '仅使用合成身份'}>
               {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${productState.role} · 退出` : '合成登录'}
             </button>
@@ -1498,6 +1498,7 @@ export function QueryApp() {
           onToggleSmartRetrieval={() => {
             const next = !smartEnabled;
             setSmartEnabled(next);
+            cancelPendingSearch();
             const write = window.customerAgent?.productSearch?.setRetrievalPreference?.({ smartEnabled: next })
               .then((preference) => {
                 setSmartEnabled(preference.smartEnabled);

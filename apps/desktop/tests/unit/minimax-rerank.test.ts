@@ -42,4 +42,31 @@ describe('minimax rerank parser', () => {
       else process.env.MINIMAX_API_KEY = previous;
     }
   });
+
+  it('stays null when unconfigured and keeps BM25 order when chat fails', async () => {
+    const previous = process.env.MINIMAX_API_KEY;
+    delete process.env.MINIMAX_API_KEY;
+    expect(loadMinimaxReranker()).toBeNull();
+    process.env.MINIMAX_API_KEY = 'test-key';
+    try {
+      const ranked = [
+        { scriptId: 'a', title: 'A', questionText: '', answerText: 'aa', score: 3 },
+        { scriptId: 'b', title: 'B', questionText: '', answerText: 'bb', score: 2 },
+      ];
+      let calls = 0;
+      const reranker = loadMinimaxReranker({
+        fetchImpl: (async () => {
+          calls += 1;
+          throw new Error('timeout');
+        }) as typeof fetch,
+      });
+      expect(await reranker!.rerank('query', ranked.slice(0, 1))).toEqual(ranked.slice(0, 1));
+      expect(calls).toBe(0);
+      expect(await reranker!.rerank('query', ranked)).toEqual(ranked);
+      expect(calls).toBe(1);
+    } finally {
+      if (previous === undefined) delete process.env.MINIMAX_API_KEY;
+      else process.env.MINIMAX_API_KEY = previous;
+    }
+  });
 });

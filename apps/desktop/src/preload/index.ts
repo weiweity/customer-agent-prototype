@@ -72,39 +72,30 @@ async function queryInvoke(channel: string, request: QueryIdentity) {
     return matches ? value : queryFailure('UNAVAILABLE', request);
   } catch { return queryFailure('UNAVAILABLE', request); }
 }
+async function readRetrievalPreference() {
+  try {
+    const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
+    return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
+  } catch {
+    return DEFAULT_RETRIEVAL_PREFERENCE;
+  }
+}
 const api: CustomerAgentApi = {
   productSearch: {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
     copyAdopt: request => queryInvoke(IPC_CHANNELS.PRODUCT_COPY_ADOPT, request) as Promise<ProductCopyResult>,
     cancelSearch: request => queryInvoke(IPC_CHANNELS.PRODUCT_CANCEL_SEARCH, request) as Promise<ProductCancelResult>,
     async retrievalPreference() {
-      try {
-        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
-        return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
-      } catch {
-        return DEFAULT_RETRIEVAL_PREFERENCE;
-      }
+      return readRetrievalPreference();
     },
     async setRetrievalPreference(next) {
       const parsed = parseRetrievalPreference(next);
-      if (!parsed) {
-        try {
-          const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
-          return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
-        } catch {
-          return DEFAULT_RETRIEVAL_PREFERENCE;
-        }
-      }
+      if (!parsed) return readRetrievalPreference();
       try {
         const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_SET, parsed);
-        return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
+        return parseRetrievalPreference(value) ?? await readRetrievalPreference();
       } catch {
-        try {
-          const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.PRODUCT_RETRIEVAL_PREFERENCE_GET);
-          return parseRetrievalPreference(value) ?? DEFAULT_RETRIEVAL_PREFERENCE;
-        } catch {
-          return DEFAULT_RETRIEVAL_PREFERENCE;
-        }
+        return readRetrievalPreference();
       }
     },
   },

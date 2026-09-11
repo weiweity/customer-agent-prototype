@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
 import {
-  rankScripts,
   rankScriptsMulti,
   RETRIEVAL_POOL,
   type RankedRetrieval,
@@ -83,6 +82,4 @@ export function loadRetrievalPipeline(
   }
 }
 
-export function lexicalRank(query: string, scripts: readonly RetrievalScript[]): readonly RankedRetrieval[] {
-  return rankScripts(query, scripts, RETRIEVAL_POOL);
-}
+

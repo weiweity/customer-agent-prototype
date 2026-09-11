@@ -17,7 +17,6 @@ const RISK_CATEGORIES = [
   'account_privacy', 'complaint_escalation', 'legal_commitment',
 ] as const;
 const PLACEHOLDERS = ['order_id', 'date'] as const;
-const RANKS = [1, 2, 3] as const;
 
 type SnapshotRow = Readonly<{
   releaseId: string;
@@ -85,10 +84,10 @@ function parseSnapshotRow(item: object, releaseId: string): SnapshotRow | null {
   const placeholderKeys = parseEnumList(Reflect.get(item, 'placeholderKeys'), PLACEHOLDERS);
   if (typeof scriptId !== 'string' || scriptId.length < 1) return null;
   if (typeof scriptVersion !== 'number' || !Number.isInteger(scriptVersion) || scriptVersion < 1) return null;
-  if (typeof contentHash !== 'string' || contentHash.length < 1) return null;
+  if (typeof contentHash !== 'string' || !/^[0-9a-f]{64}$/.test(contentHash)) return null;
   if (typeof title !== 'string' || title.trim().length < 1) return null;
   if (!isMember(category, CATEGORIES)) return null;
-  if (typeof answerText !== 'string') return null;
+  if (typeof answerText !== 'string' || answerText.trim().length < 1) return null;
   if (!platformScope || platformScope.length === 0) return null;
   if (!isMember(productScopeType, SCOPE_TYPES)) return null;
   if (!productScopeRefs) return null;
@@ -172,9 +171,7 @@ export function loadHydrateCatalog(indexPath = process.env.CUSTOMER_AGENT_HYDRAT
         for (const row of ranked) {
           const found = byId.get(row.scriptId);
           if (!found) continue;
-          const rank = RANKS[out.length];
-          if (rank === undefined) break;
-          out.push(asCandidate(found, rank));
+          out.push(asCandidate(found, 1));
         }
         return out;
       },

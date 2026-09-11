@@ -69,7 +69,6 @@ export function loadMinimaxReranker(options: MinimaxRerankerOptions = {}): Reran
       if (!content) return ranked;
       const ids = parseRerankIds(content, allowed);
       if (ids.length === 0) return ranked;
-      console.log('[minimax-rerank] ok');
       return Object.freeze(mergeOrder(ids, ranked));
     },
   });

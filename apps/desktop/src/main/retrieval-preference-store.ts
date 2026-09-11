@@ -12,12 +12,16 @@ export type RetrievalPreferenceStore = Readonly<{
 }>;
 
 export function loadRetrievalPreferenceStore(filePath: string): RetrievalPreferenceStore {
+  let lastGood: RetrievalPreference = DEFAULT_RETRIEVAL_PREFERENCE;
   const read = (): RetrievalPreference => {
-    if (!existsSync(filePath)) return DEFAULT_RETRIEVAL_PREFERENCE;
+    if (!existsSync(filePath)) return lastGood;
     try {
-      return parseRetrievalPreference(JSON.parse(readFileSync(filePath, 'utf8'))) ?? DEFAULT_RETRIEVAL_PREFERENCE;
+      const parsed = parseRetrievalPreference(JSON.parse(readFileSync(filePath, 'utf8')));
+      if (!parsed) return lastGood;
+      lastGood = parsed;
+      return parsed;
     } catch {
-      return DEFAULT_RETRIEVAL_PREFERENCE;
+      return lastGood;
     }
   };
   return Object.freeze({
@@ -25,6 +29,7 @@ export function loadRetrievalPreferenceStore(filePath: string): RetrievalPrefere
     write(next: RetrievalPreference) {
       mkdirSync(dirname(filePath), { recursive: true });
       writeFileSync(filePath, `${JSON.stringify(next)}\n`);
+      lastGood = next;
       return next;
     },
   });

@@ -15,7 +15,6 @@ import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 import { loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
 import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
-import type { RetrievalPreference } from '../shared/retrieval-preference';
 
 export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
 
@@ -117,12 +116,6 @@ export class ProductSearch {
     try { this.advance(sender, identity); return { ok: true, ...identity, cancelled: true }; }
     catch (error) { return this.failure(error, identity); }
   }
-  retrievalPreference(): RetrievalPreference {
-    return this.preference.read();
-  }
-  setRetrievalPreference(next: RetrievalPreference): RetrievalPreference {
-    return this.preference.write(next);
-  }
   private usable(candidate: ProductCandidate, state: SearchState) {
     const platformOk = state.platform === 'all'
       ? candidate.platform_scope.some((platform) => platform === 'qianniu' || platform === 'douyin')
@@ -150,7 +143,10 @@ export class ProductSearch {
           : rewritten;
       }
       if (this.hydrate) {
-        const local = this.hydrate.hydrate(ranked).filter((candidate) => this.usable(candidate, state));
+        const local = this.hydrate.hydrate(ranked)
+          .filter((candidate) => this.usable(candidate, state))
+          .slice(0, 3)
+          .map((candidate, index) => ({ ...candidate, rank: (index + 1) as 1 | 2 | 3 }));
         if (local.length > 0) {
           if (!this.announce.allows(local[0]!.release_id)) throw new ProductHttpError('STALE');
           return this.finishLocal(sender, state, request, local[0]!.release_id, local);
@@ -206,6 +202,7 @@ export class ProductSearch {
     releaseId: string,
     candidates: ProductCandidate[],
   ): Extract<ProductSearchResult, { ok: true }> {
+    this.current(sender, state);
     const queryId = randomUUID();
     const origins = new Map(candidates.map((candidate) => [candidate.script_id, queryId]));
     const result: Extract<ProductSearchResult, { ok: true }> = {
