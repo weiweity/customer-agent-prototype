@@ -8,7 +8,7 @@
 > 复制成功只表示剪贴板写入成功，不表示已发送、已采纳或回答正确。
 > Dashboard 是交互式合成 BI / 架构故事，不是生产系统。
 
-相关文档：[如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
+相关文档：[如何验证](how-to-verify-desktop.md) · [项目架构](reference-project-architecture.md) · [桌面合同](reference-desktop-contracts.md) · [How to 启动检索浮窗](how-to-run-macos-semantic-query.md) · [API adapter 衔接](reference-api-adapter-handoff.md) · [失败安全说明](explanation-failure-safe-lifecycle.md) · [README](../README.md)
 
 ---
 
