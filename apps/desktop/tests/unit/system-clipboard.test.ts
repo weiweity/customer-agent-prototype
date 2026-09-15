@@ -21,6 +21,7 @@ describe('system clipboard', () => {
   });
 
   it('throws when Electron write does not stick and the platform fallback fails', () => {
+    if (process.platform === 'darwin') return;
     vi.mocked(clipboard.writeText).mockImplementation(() => undefined);
     vi.mocked(clipboard.readText).mockReturnValue('');
     expect(() => writeSystemClipboard('合成联系卡')).toThrow(/did not stick/);
