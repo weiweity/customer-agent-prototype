@@ -42,7 +42,8 @@ export type PackagedProductProfile = Readonly<{
  * Why the packaged profile could not be used. The distinction exists so the
  * startup failure notice can tell an operator to install the stack (file
  * absent) apart from "this file is wrong" (present but rejected) apart from
- * "we could not even look" (present but unreadable). All three stay the same
+ * "we could not read it" (present but unreadable — either the directory is not
+ * traversable or the file itself is not readable). All three stay the same
  * fail-closed outcome; only the explanation differs.
  */
 export type PackagedProfileErrorKind = 'missing' | 'invalid' | 'unreadable';
@@ -91,11 +92,24 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   // A non-regular file (symlink, directory) or an implausible size is a
   // rejected file, not a missing one, so it keeps the "invalid" explanation.
   if (!stats.isFile() || stats.size === 0 || stats.size > MAX_BYTES) return { ok: false, kind: 'invalid' };
+  let contents: string;
+  try {
+    contents = readFileSync(file, 'utf8');
+  } catch (error: unknown) {
+    // The entry was there a moment ago but could not be read. Only ENOENT means
+    // the file is genuinely absent (it disappeared between the two calls);
+    // anything else — EACCES/EPERM/EBUSY — is an access problem the operator
+    // can fix and then retry. Reporting it as a rejected file would send them
+    // after a validation that never ran, and would withhold the retry that the
+    // unreadable explanation offers.
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    return { ok: false, kind: code === 'ENOENT' ? 'missing' : 'unreadable' };
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(file, 'utf8'));
+    parsed = JSON.parse(contents);
   } catch {
-    // Unreadable or non-JSON content: present but rejected, same fail-closed path.
+    // Non-JSON content: present and readable but rejected, same fail-closed path.
     return { ok: false, kind: 'invalid' };
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, kind: 'invalid' };

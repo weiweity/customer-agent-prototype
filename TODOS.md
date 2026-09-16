@@ -4,7 +4,9 @@
 >
 > **Open 段的来源：** 2026-09-16 的交付形态评审（对 Windows 打包态在办公机上的可用性做只读复核）。该评审推翻了若干先前判断，结论见下。
 >
-> **状态口径（2026-09-16 复核后）：** 本节各项**均未提交、未合并**，各自进度见该项 Status。**「未提交」不等于「未开工」**——P1 的可见提示与 P8 的文档修正已在工作区实现并自测通过，只是尚未走 Git 流程；P1 的重试入口与打包态实机验证仍未做。
+> **状态口径（2026-09-17 打包态实机验证后）：** P1 的可见提示与 P8 的文档修正已随 `d419016` 提交到分支 `fix/packaged-startup-failure-notice`（PR #93，**未合并**）。**P1 的打包态实机验证已执行，结论为通过**。其余各项进度见各自 Status。
+>
+> **方法论警告（2026-09-17）：** 验证期间曾把「对话框几秒后自行消失」判成缺陷，随后证伪——这台机器上**有人在操作**，观测窗口内 `HIDIdleTime` 从未超过 3.5 秒，且返回值是按钮下标而非模态中止码。**在本机做任何「对话框会不会自己关掉」的自动化观测都不可信**，除非同时记录 HID 输入空闲时间。
 
 ## Open
 
@@ -16,7 +18,16 @@
 
 **Context:** `apps/desktop/src/main/product-runtime-config.ts`（`PackagedProfileError`，kind 为 `missing` / `invalid` / `unreadable`）、`apps/desktop/src/main/startup-failure-notice.ts`（可见提示）、`apps/desktop/src/main/main.ts:168`（调用点）、`apps/desktop/src/main/main.ts:230`（退出路径）。fail-closed 必须保留，不得退回 S0 静默降级。
 
-**Status:** 已实现（工作区未提交，**待打包态实机验证**）。**已完成**：可见提示（按 missing / invalid / unreadable 三类给不同文案）、重试入口（missing 与 unreadable 提供「重试」按钮，走 `app.relaunch()`；invalid 与未知错误只给「退出」）、fail-closed 保留、单测覆盖三类失败与四种按钮组合。**未完成**：打包态真实产物上的验证——当前全部覆盖都在单测层面，尚未在真实 `.app` / `.exe` 上触发过弹窗与退出。
+**Status:** 已实现（`d419016`），**打包态实机验证通过**。
+
+在真实 `.app`（`pnpm package:mac:local` 产物，asar 内含新代码）上确认：
+
+- `missing` 与 `invalid` 两类都弹出了文案与按钮正确的原生对话框。按窗口 ID 截图可见标题、正文与两个按钮；直接运行二进制时进程阻塞在 `-[NSAlert runModal]`，`sample` 采样 1645/1645 帧全在主模态循环内，对话框不会自行关闭。
+- `invalid` 正确拒绝了 `apiOrigin` 指向非 loopback 的配置（`kind: 'invalid'`），fail-closed 保留，未退回 S0。
+- **「重试」入口被真实点击验证过**：`missing` 场景下按默认按钮（下标 0 = 重试）后，进程树出现 `app.relaunch()` 特征——原进程派生一个子进程后退出，0.5 秒后新实例起来并重新弹窗。重试链路端到端成立。
+- 单按钮场景（`invalid`）按下按钮后不重试、直接 fail-closed 退出，与设计一致。
+
+**未覆盖**：`unreadable` 无法在真产物上复现（触发它需要 profile 目录本身不可穿越，那会连带破坏 Electron 其余的 userData 处理），仍只有单测覆盖；「重试」按钮的**合成点击**无法在本机做（进程无辅助功能权限，`AXIsProcessTrusted=false`），上面的重试证据来自真实人工点击。
 
 ### P2 · 首轮 Windows 验收范围未定
 

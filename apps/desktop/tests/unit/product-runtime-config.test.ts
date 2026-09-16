@@ -127,6 +127,28 @@ describe('packaged synthetic product profile', () => {
     }
   });
 
+  it('reports a present but unreadable profile file as unreadable, not as rejected', () => {
+    const directory = userDataDirectory();
+    const profile = path.join(directory, SYNTHETIC_STACK_PROFILE_FILE);
+    write(directory, STACK_PROFILE);
+
+    // The directory stays traversable, so lstatSync succeeds and this looks like
+    // a well-formed file of the right size; only opening it fails. A read
+    // failure is an access problem the operator can fix and retry, so it must
+    // not be reported as a rejected file — that would claim a validation ran
+    // and would withhold the retry the unreadable explanation offers.
+    chmodSync(profile, 0o000);
+    try {
+      readPackagedProductProfile(directory);
+      expect.unreachable('unreadable profile must fail closed');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(PackagedProfileError);
+      expect((error as PackagedProfileError).kind).toBe('unreadable');
+    } finally {
+      chmodSync(profile, 0o600);
+    }
+  });
+
   it('refuses a symlinked profile file', () => {
     const directory = userDataDirectory();
     const target = path.join(directory, 'real.json');

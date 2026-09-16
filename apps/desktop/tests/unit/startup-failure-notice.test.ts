@@ -202,16 +202,24 @@ describe('startup failure notice', () => {
 
   it('notifies and still quits fail-closed in the bootstrap catch path', () => {
     const main = readFileSync(path.join(desktopRoot, 'src/main/main.ts'), 'utf8');
-    const notifyAt = main.indexOf('void notifyStartupFailure(error);');
-    const shutdownAt = main.indexOf('beginShutdown();', notifyAt);
-    const quitAt = main.indexOf('app.quit();', shutdownAt);
+    // Bound the search to the startup catch block. main.ts holds other
+    // `app.quit()` calls (the single-instance guard and window-all-closed), so
+    // an unbounded indexOf would keep satisfying this ordering even if the
+    // catch block stopped quitting — the assertion would no longer pin the
+    // fail-closed exit it claims to guard.
+    const catchAt = main.indexOf('.catch((error: unknown) => {');
+    const catchBlock = main.slice(catchAt, main.indexOf('\n  });', catchAt));
+    const notifyAt = catchBlock.indexOf('void notifyStartupFailure(error);');
+    const shutdownAt = catchBlock.indexOf('beginShutdown();', notifyAt);
+    const quitAt = catchBlock.indexOf('app.quit();', shutdownAt);
 
+    expect(catchAt).toBeGreaterThan(-1);
     expect(notifyAt).toBeGreaterThan(-1);
     // The notice must be attempted before the shutdown fence flips, then the
     // process quits exactly as before: the visible feedback does not weaken
     // the fail-closed exit.
     expect(notifyAt).toBeLessThan(shutdownAt);
     expect(shutdownAt).toBeLessThan(quitAt);
-    expect(main).toContain("console.error('[bootstrap] 主进程启动失败，已安全退出。', error)");
+    expect(catchBlock).toContain("console.error('[bootstrap] 主进程启动失败，已安全退出。', error)");
   });
 });
