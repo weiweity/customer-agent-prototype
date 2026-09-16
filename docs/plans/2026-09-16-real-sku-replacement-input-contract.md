@@ -23,7 +23,7 @@
 | `sku_label` | 是 | 商品对外称呼，≤ 64 字符 | （真实款名） |
 | `answer_text` | 是 | 该 SKU 的话术正文，纯文本 | （真实话术） |
 
-**明确禁止入库的字段**（`AGENTS.md` §2、`docs/reference-engineering-workflow.md`）：
+**明确禁止入库的字段**（依据 `AGENTS.md` §2：不得把原文、订单、图片、批次、员工、快递或竞品评价写入仓库或未获批运行链路）：
 
 - 真实订单号、买家信息、快递单号
 - 员工姓名、工号、内部联系方式
@@ -54,7 +54,7 @@ for (const { product } of products) {
 1. `apps/desktop/src/shared/synthetic-catalog.ts` 的 `SYNTHETIC_CATALOG`（仓内，id 与 label）
 2. 仓外 `retrieval-index.json` / `-embeddings.json` / `-hydrate.json`（仓外）
 
-`SYNTHETIC_CATALOG` 被 `scripts/synthetic-stack/`（种子导入行与自检）和 desktop main（只读投影给 renderer）共同消费，改它会连带影响合成栈种子与现有测试（`synthetic-catalog.test.ts`、`query-route.test.ts`、`QueryApp.test.tsx` 等直接断言澄芽/雾屿）。**这是一次仓内代码改动，不是纯数据操作**，需要独立的代码授权，不能和"跑三步脚本"混为一谈。
+`SYNTHETIC_CATALOG` 被两处消费：`scripts/synthetic-stack/stack.ts`（`catalogReferences()` 打印目录引用）与 `scripts/synthetic-stack/stack.test.ts`（断言每条非 storewide 种子的 `product_scope_refs` 都能被目录标注），以及 desktop main（`product-catalog.ts` 投影给 renderer）。改它会连带影响直接断言澄芽/雾屿的测试：`tests/unit/synthetic-catalog.test.ts`、`tests/unit/query-route.test.ts`、`tests/unit/search-service.test.ts`、`tests/component/QueryApp.test.tsx`、`tests/component/DashboardApp.test.tsx`、`tests/fixtures/synthetic-development-baseline.ts`，以及 `tests/e2e/` 下的 `synthetic-stack.spec.ts` / `smoke.spec.ts`。**这是一次仓内代码改动，不是纯数据操作**，需要独立的代码授权，不能和"跑三步脚本"混为一谈。
 
 ## 3. 执行顺序（授权后）
 
@@ -72,7 +72,7 @@ for (const { product } of products) {
 6) 人眼在开发态验证新款名路由到 SKU 话术
 ```
 
-第 5 步的 hydrate 必须进**发布快照**才有意义：`retrieval:hydrate` 手工写入要求先有 `--from <snapshot.json>`，而 snapshot 来自合成登录分页。空 snapshot 不覆盖（`sync-retrieval-hydrate.ts` 明确 `skipped: true, reason: 'empty'`）。
+第 5 步的 hydrate 必须进**发布快照**才有意义：`retrieval:hydrate` 手工写入要求先有 `--from <snapshot.json>`，而 snapshot 来自合成登录分页。空 snapshot 不覆盖——该行为在 `apps/desktop/src/main/hydrate-catalog.ts` 的 `syncHydrateCatalog()` 中实现（`skipped: true, reason: 'empty'`）；`scripts/sync-retrieval-hydrate.ts` 只是它的 CLI 调用方。
 
 ## 4. 校验（在跑第 3 步之前）
 

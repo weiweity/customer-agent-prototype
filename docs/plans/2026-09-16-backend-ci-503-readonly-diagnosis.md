@@ -31,7 +31,7 @@ POST /v1/announce/snapshot
 
 `validate_snapshot_offline_lease` 在 `packages/database/migrations/0007_search_bigram.sql:272` 明确 `RAISE EXCEPTION USING ERRCODE = 'ZA004', DETAIL = 'OFFLINE_LEASE_INVALID'`。SQL 侧是对的。
 
-所以 500 意味着**到达 JS catch 的 error 对象上，`code` 与 `detail` 两样都丢了**——`sqlStateOf()` 与 `contractReason()` 都读不到 `ZA004`。映射层本身（`announceFailure` 第 326–331 行）写得没问题。
+所以 500 意味着**到达 JS catch 的 error 对象上，`code` 与 `detail` 两样都丢了**——`sqlStateOf()` 与 `contractReason()` 都读不到 `ZA004`。映射层本身（`announceFailure`，其中 `if (state === 'ZA004')` 映射块在 `announce-service.ts:329-331`）写得没问题。
 
 **丢字段的最可能机制**（PR #79 的提交信息已独立确认过一次）：node-pg 在**查询超时**时会把迟到的 `ZA004` 替换成 Query read timeout，并可能销毁 socket。此时抛出的不再是数据库错误，而是一个没有 `code`/`detail` 的连接层错误，于是落进 `mapDatabaseContractError` 的 `INTERNAL` 兜底。
 

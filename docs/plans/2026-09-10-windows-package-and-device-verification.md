@@ -55,7 +55,7 @@
 | --- | --- | --- |
 | 启动配置 | 未批准打包态产品 profile 前，安装包按 S0 合成 fixture 启动，不读真实 URL | 合成 API 是同机 loopback，还是另批测试主机；当前代码只允许 127.0.0.1 |
 | 后端连接 | 首轮若要跑 D1–D5 主链，API / 合成身份 / PostgreSQL 15 必须出现在获批拓扑里，且仍是 synthetic-only | Windows 测试机是否安装 PG15；端口、防火墙、开机自启均未定 |
-| 日志与脱敏 | 诊断不得写入真实客户原文、token、内部 URL；失败码与哈希化标识可保留。**桌面应用当前没有文件日志设施**：主进程只在启动失败时 `console.error`，renderer 无落盘能力；`~/.customer-agent-synthetic-stack/logs/` 下的 `api.log` / `identity.log` / `worker.log` / `postgres.log` 由 `scripts/synthetic-stack/stack.ts` 用 `openSync` 重定向子进程 stdio 生成，属于**栈侧**而非应用侧。打包态应用双击启动时没有这些重定向，stdout 去向取决于启动方式 | 安装后日志目录、保留天数、如何从试装机取回；现无现成 Windows 采集手册，且取回前需先决定要不要为此新增应用侧日志设施 |
+| 日志与脱敏 | 诊断不得写入真实客户原文、token、内部 URL；失败码与哈希化标识可保留。**桌面应用当前没有文件日志设施**：`apps/desktop/src` 里有 16 处 `console.warn` / `console.error`（启动失败、Tray 降级、Dashboard 打开失败、MiniMax 回退等），全部只写 stdout/stderr，**不落盘**；renderer 无任何写文件能力。`~/.customer-agent-synthetic-stack/logs/` 下的 `api.log` / `identity.log` / `worker.log` / `postgres.log` 由 `scripts/synthetic-stack/stack.ts` 的 `spawnLogged()` 用 `openSync` 重定向子进程 stdio 生成，属于**栈侧**而非应用侧。打包态应用双击启动时没有这些重定向，stdout 去向取决于启动方式 | 安装后日志目录、保留天数、如何从试装机取回；现无现成 Windows 采集手册，且取回前需先决定要不要为此新增应用侧日志设施 |
 | 交付位置 | 未签名包只放本机 `release/local-unsigned/windows/`，被 Git 忽略 | 用户测试包的传递方式（当面拷贝 / 受控网盘）；禁止公开 Release 当正式分发 |
 
 ## 4. 功能验收项（实机，合成数据）
@@ -130,7 +130,7 @@ S0 安装包若未接通产品 profile，上表登录/查询/失效不适用；�
 
 - 最低 OS 口径：Electron 43.4.0 官方为 **Windows 10 and up**（见第 1 节）。是否在 `build.win` 显式声明、声明成什么，仍待用户拍板
 - 安装 / 升级 / 卸载 / 异常恢复的**当前实现边界**已逐条落在第 5 节，含 NSIS `oneClick` / `perMachine` / 不可改目录、无自动更新元数据、后验拒绝 `.blockmap` 与 `latest*.yml`
-- 日志口径已澄清：应用侧**无文件日志设施**，栈侧日志由 `stack.ts` 重定向产生（见第 3 节）。这条从"待确认日志目录"变成了"待决定是否新增应用侧设施"
+- 日志口径已澄清：应用侧**无文件日志设施**（16 处 `console.*` 只写 stdout/stderr），栈侧日志由 `stack.ts` 重定向产生（见第 3 节）。这条从"待确认日志目录"变成了"待决定是否新增应用侧设施"
 - Windows 上的 userData 目录名风险已登记（见第 5 节）：`app.setName` 含中文，实机首启失败先查目录名再查代码
 
 **现在可并行、且不构成本文开工：**
