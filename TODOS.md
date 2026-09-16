@@ -1,6 +1,142 @@
 # TODOS
 
-> **复核：** 2026-09-10。四项 P3 窄分支已由产品 PR #69 合并。登录残留红字已由 PR #68 修复（本页 Login residual 为 DONE）。它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。macOS M5 人工勾选见 `docs/how-to-verify-macos-m5.md`，清单进仓不等于验收通过。
+> **复核：** 2026-09-16。四项 P3 窄分支已由产品 PR #69 合并。登录残留红字已由 PR #68 修复。BACKEND-CI-503 已由 PR #91 修复并关闭。它们仍属于 Menokin `PILOT-S0` 合成基线验证，不构成 G0 / Ddev 或正式 DEV-M0 授权。macOS M5 人工勾选见 `docs/how-to-verify-macos-m5.md`，清单进仓不等于验收通过。
+>
+> **Open 段的来源：** 2026-09-16 的交付形态评审（对 Windows 打包态在办公机上的可用性做只读复核）。该评审推翻了若干先前判断，结论见下。
+>
+> **状态口径（2026-09-16 复核后）：** 本节各项**均未提交、未合并**，各自进度见该项 Status。**「未提交」不等于「未开工」**——P1 的可见提示与 P8 的文档修正已在工作区实现并自测通过，只是尚未走 Git 流程；P1 的重试入口与打包态实机验证仍未做。
+
+## Open
+
+### P1 · 打包态配置失败没有可见反馈
+
+**What:** 打包构建在 userData 缺 `synthetic-stack.json`、其中 origin 非法、或该文件不可读时，`product-runtime-config.ts` 抛错，`main.ts` 的 catch 后 `app.quit()`。双击 exe 时看不到 stdout，使用者只看到「闪一下」。
+
+**Why:** 拒绝业务运行是合理设计；**无可见解释地退出是另一项可用性问题**。当前办公机场景必然命中这条路径。
+
+**Context:** `apps/desktop/src/main/product-runtime-config.ts`（`PackagedProfileError`，kind 为 `missing` / `invalid` / `unreadable`）、`apps/desktop/src/main/startup-failure-notice.ts`（可见提示）、`apps/desktop/src/main/main.ts:168`（调用点）、`apps/desktop/src/main/main.ts:230`（退出路径）。fail-closed 必须保留，不得退回 S0 静默降级。
+
+**Status:** 已实现（工作区未提交，**待打包态实机验证**）。**已完成**：可见提示（按 missing / invalid / unreadable 三类给不同文案）、重试入口（missing 与 unreadable 提供「重试」按钮，走 `app.relaunch()`；invalid 与未知错误只给「退出」）、fail-closed 保留、单测覆盖三类失败与四种按钮组合。**未完成**：打包态真实产物上的验证——当前全部覆盖都在单测层面，尚未在真实 `.app` / `.exe` 上触发过弹窗与退出。
+
+### P2 · 首轮 Windows 验收范围未定
+
+**What:** 需要用户明确：办公机首轮只验安装/启动/浮窗/快捷键/卸载，还是要验完整产品会话链（登录、查询、复制、STALE）。
+
+**Why:** 这个决定直接选择实现路径，比「Windows 四项确认」更根本。只验前者用离线 synthetic profile 即可；验后者必须先补后端鉴权与访问准入。
+
+**Context:** 见 `docs/plans/2026-09-10-windows-package-and-device-verification.md`。约束澄清要点：办公机是**只是不能单独安装开发工具**，还是**也禁止包内辅助进程、本地监听、数据库进程**？Electron 本身内置 Node.js，"不装 Node/pnpm" 不等于"应用内不能用 Node 运行时"。
+
+**Effort:** — （决定项）
+**Priority:** P1
+**Depends on:** None
+**Status:** OPEN · 待用户
+
+### P3 · 显式离线 synthetic profile
+
+**What:** 给应用加一个离线演示运行模式，使用安装包内自带的合成 fixture，完全不连后端。
+
+**Why:** 满足办公机约束的最短路径。可验安装、启动、浮窗、快捷键、卸载；不可验登录/查询/复制/STALE。
+
+**Context:** 仅在 P2 判定为「只验安装与交互」时实施。不得把它当作产品主链验收。
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** P2
+**Status:** OPEN · 未授权
+
+### P4 · 远端后端 profile（含必须先做的鉴权）
+
+**What:** 让打包客户端连接受控 HTTPS 远端，后端 API 与 PG 留在服务器内网，不公开 PG。
+
+**Why:** **这是候选路径之一，不是唯一路径。** 若 P2 判定需要完整产品会话链，则需要一条能让办公机访问后端的通道；远端是其中一条，包内后端（P10）与受控本机栈是另外的候选。选择取决于「办公机是否允许包内辅助进程 / 本地监听」这一未决约束。
+
+**Context:** **关键前置：当前合成身份不验证使用者身份**——`scripts/synthetic-stack/identity-provider.ts:60` 的 `/authorize` 直接授予默认身份，`/exchange` 接受预置 binding。**只把服务搬上 HTTPS 而不补可信身份来源与访问准入，等于把不设防接口暴露给更多主体。** loopback 强制的真实价值是**访问范围限制**，不是调用者身份证明；证书固定只加强"连的是谁"，不证明"连接者获准做什么"。
+
+**但鉴权不是从零开始。** 本仓已有可复用的授权机制：`apps/api/src/product-auth-service.ts` 的 `authenticate` 校验 bearer 并调用 `backend_identity.actor()` 取角色；`apps/api/src/policy-rules.ts` 的 `authorizePolicyUpdate` 按 `owner` 角色授权；能力池另有角色约束与 readiness 投影。缺口是**可信身份来源**（合成 provider 直接放行）与**远端访问准入**，应基于既有机制补齐，不是重建授权层。
+
+工程量不止一处 URL 校验：`apps/desktop/src/main/product-http.ts:7`、`product-runtime-config.ts`、`product-login-window.ts`、`apps/api/src/synthetic-identity-provider.ts:4` 及 callback 路径均有 loopback 假设。
+
+pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检查代理的兼容成本）。
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** P2 + 独立安全评审
+**Status:** OPEN · 未授权
+
+### P5 · 会话未绑定后端身份
+
+**What:** 会话存储文件名固定 `product-session.enc`，未按环境或服务身份隔离。
+
+**Why:** 新增远端 profile 后若复用同一存储，恢复逻辑可能把旧 token 发往新目标。属安全隐患。
+
+**Context:** `apps/desktop/src/main/product-session-store.ts:9`、`apps/desktop/src/main/product-session.ts:57`。修法：按环境/服务身份隔离会话与缓存，切换目标时清理旧状态。
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** P4（若走远端才成为阻塞）
+**Status:** OPEN
+
+### P6 · 两条网络栈的证书/代理覆盖
+
+**What:** `ProductHttp` 默认使用全局 `fetch`；登录窗口使用独立 Electron session。
+
+**Why:** 不能假设给默认 session 加一个证书钩子就覆盖所有请求。代理、证书策略与 pinning 都必须验证**实际传输路径**。
+
+**Context:** `apps/desktop/src/main/product-http.ts:23`、`apps/desktop/src/main/product-login-window.ts:21`。
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** P4
+**Status:** OPEN
+
+### P7 · 检索资产的交付路径
+
+**What:** 桌面主要查询能力不全在 API——main 使用仓外本地索引与 hydrate 快照。
+
+**Why:** 新机器上的索引初始化、发布版本对齐、缓存失效必须纳入交付设计，不能只迁移 API + PG。打包态目前按文件存在与否决定是否启用（`packaged-retrieval-paths.ts:25`），文件不在就没有主链。
+
+**Context:** `docs/reference-desktop-retrieval.md`、`apps/desktop/src/main/packaged-retrieval-paths.ts:18`。
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** P2
+**Status:** OPEN
+
+### P8 · Windows DRAFT 与启动代码冲突
+
+**What:** Windows 方案文档两处称缺少拓扑时「按 S0 合成 fixture 启动」「只能验浮窗」，与当前启动代码不符——代码是**配置缺失即抛错退出，不退回 S0**。
+
+**Why:** 文档与代码冲突会误导验收范围判断。**这是 P1 的根因在文档层的体现。**
+
+**Context:** `docs/plans/2026-09-10-windows-package-and-device-verification.md` 的 §2 数据与身份、§3 启动配置行、§4 末尾、§9 日志口径共四处；对照 `apps/desktop/src/main/product-runtime-config.ts`。
+
+**Status:** 已在工作区修正（未提交）。四处冲突表述已改为与代码一致的「配置缺失即退出，不退回 S0」。
+
+### P10 · 办公机免装依赖的交付问题（尚未解决）
+
+**What:** 当前安装包**只包含 desktop 的 `out` 与资产**。要跑产品主链，目标机仍需外部准备 API、worker、合成身份、PostgreSQL 15 与仓外索引文件（`discoverPg15Bin` 要求本机有 PG15 二进制；栈侧代码还要求 `requireDist` 指向已构建的 API 产物）。**这不是「基本满足免装依赖」，而是完全依赖外部准备。**
+
+**Why:** 这是办公机场景的**真正待解问题**。P1 只让失败变得可见，没有让包变得自足。
+
+**Context:** `scripts/synthetic-stack/stack.ts`（PG15 发现与 API dist 依赖）、`apps/desktop/scripts/package-windows.mjs`（打包范围）、`apps/desktop/src/main/packaged-retrieval-paths.ts`（索引文件存在于用户家目录）。候选方向：包内托管后端（见评审文档方案表）、远端后端（P4）、显式离线 profile（P3）。选哪条取决于 P2 的约束澄清。
+
+**Effort:** L
+**Priority:** P1
+**Depends on:** P2
+**Status:** OPEN · 未开工
+
+### P9 · M5 受影响项在新 profile 下需重验
+
+**What:** 若引入远端或离线 profile，以下 M5 既有观察需重验：登录失效提示（含断网，确认网络错误不被误当身份失效）、M4 打包态登录/查询/复制（从干净配置开始）、STALE（远端发布/回退、租约、延迟响应）。
+
+**Why:** 历史观察仍然有效，但**不能自动覆盖新模式**。
+
+**Context:** `docs/how-to-verify-macos-m5.md` 第 7 节。关窗取消项**保持未观察**；Mac 浮窗等未受影响行为可按变更范围复用原证据，但不能替代 Windows 实机证据。
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** P3 或 P4
+**Status:** OPEN
 
 ## Completed
 

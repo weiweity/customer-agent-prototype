@@ -1,4 +1,4 @@
-import { readFileSync, lstatSync } from 'node:fs';
+import { readFileSync, lstatSync, type Stats } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -26,13 +26,39 @@ import path from 'node:path';
 export const SYNTHETIC_STACK_PROFILE_FILE = 'synthetic-stack.json';
 const MODE = 'synthetic-local';
 const MAX_BYTES = 4_096;
-const PACKAGED_PROFILE_ERROR =
+const MISSING_PROFILE_ERROR =
+  'Packaged desktop requires synthetic-stack.json under userData';
+const INVALID_PROFILE_ERROR =
   'Packaged desktop requires a valid synthetic-stack.json under userData';
+const UNREADABLE_PROFILE_ERROR =
+  'Packaged desktop could not read synthetic-stack.json under userData';
 
 export type PackagedProductProfile = Readonly<{
   apiOrigin: string;
   identityOrigin: string;
 }>;
+
+/**
+ * Why the packaged profile could not be used. The distinction exists so the
+ * startup failure notice can tell an operator to install the stack (file
+ * absent) apart from "this file is wrong" (present but rejected) apart from
+ * "we could not even look" (present but unreadable). All three stay the same
+ * fail-closed outcome; only the explanation differs.
+ */
+export type PackagedProfileErrorKind = 'missing' | 'invalid' | 'unreadable';
+
+/** Fail-closed startup error. Carries only a kind — never the file path. */
+export class PackagedProfileError extends Error {
+  readonly kind: PackagedProfileErrorKind;
+
+  constructor(kind: PackagedProfileErrorKind) {
+    super(kind === 'missing'
+      ? MISSING_PROFILE_ERROR
+      : kind === 'invalid' ? INVALID_PROFILE_ERROR : UNREADABLE_PROFILE_ERROR);
+    this.name = 'PackagedProfileError';
+    this.kind = kind;
+  }
+}
 
 function loopbackOrigin(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -45,32 +71,49 @@ function loopbackOrigin(value: unknown): string | undefined {
   return url.origin;
 }
 
-function failPackagedProfile(): never {
-  throw new Error(PACKAGED_PROFILE_ERROR);
-}
+type PackagedProfileParse =
+  | { readonly ok: true; readonly profile: PackagedProductProfile }
+  | { readonly ok: false; readonly kind: PackagedProfileErrorKind };
 
-function parsePackagedProductProfile(userDataDirectory: string): PackagedProductProfile | undefined {
+function parsePackagedProductProfile(userDataDirectory: string): PackagedProfileParse {
   const file = path.join(userDataDirectory, SYNTHETIC_STACK_PROFILE_FILE);
+  let stats: Stats;
   try {
-    const stat = lstatSync(file);
-    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_BYTES) return undefined;
-    const value: unknown = JSON.parse(readFileSync(file, 'utf8'));
-    if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
-    const record = value as Record<string, unknown>;
-    if (record.mode !== MODE) return undefined;
-    const apiOrigin = loopbackOrigin(record.apiOrigin);
-    const identityOrigin = loopbackOrigin(record.identityOrigin);
-    if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) return undefined;
-    return Object.freeze({ apiOrigin, identityOrigin });
-  } catch {
-    // Missing, unreadable, or non-JSON files take the same fail-closed path.
-    return undefined;
+    stats = lstatSync(file);
+  } catch (error: unknown) {
+    // Only ENOENT means "there is no file to install". Everything else — most
+    // importantly EACCES/EPERM on a locked-down profile directory — means we
+    // could not look, and telling the operator to install the stack would send
+    // them after the wrong problem. Both stay fail-closed.
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    return { ok: false, kind: code === 'ENOENT' ? 'missing' : 'unreadable' };
   }
+  // A non-regular file (symlink, directory) or an implausible size is a
+  // rejected file, not a missing one, so it keeps the "invalid" explanation.
+  if (!stats.isFile() || stats.size === 0 || stats.size > MAX_BYTES) return { ok: false, kind: 'invalid' };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    // Unreadable or non-JSON content: present but rejected, same fail-closed path.
+    return { ok: false, kind: 'invalid' };
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, kind: 'invalid' };
+  const record = parsed as Record<string, unknown>;
+  if (record.mode !== MODE) return { ok: false, kind: 'invalid' };
+  const apiOrigin = loopbackOrigin(record.apiOrigin);
+  const identityOrigin = loopbackOrigin(record.identityOrigin);
+  if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) {
+    return { ok: false, kind: 'invalid' };
+  }
+  return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin }) };
 }
 
 /** Read and validate the packaged synthetic profile. Missing or invalid files fail closed. */
 export function readPackagedProductProfile(userDataDirectory: string): PackagedProductProfile {
-  return parsePackagedProductProfile(userDataDirectory) ?? failPackagedProfile();
+  const result = parsePackagedProductProfile(userDataDirectory);
+  if (!result.ok) throw new PackagedProfileError(result.kind);
+  return result.profile;
 }
 
 /**
