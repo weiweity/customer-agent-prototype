@@ -53,7 +53,7 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** OPEN · 未授权
+**Status:** OPEN · 未授权 · **决策材料已就绪**（`docs/plans/2026-09-17-office-machine-delivery-path-decision.md`）。实证结论：S0 链路与 fixture 今天已存在，且已被打进包（`apps/desktop/package.json:59-62` 的 `files` 只收 `out/**/*`，fixture 由 Vite 编进 `out/renderer`）；唯一阻塞点是 `main.ts:168` 的 `resolveProductProfile` 在 packaged 时无条件 fail-close。**但它不是「加一个开关」**：要反转 `product-runtime-config.ts:22-24` 明写的不变量、过 `docs/plans/2026-09-10-windows-package-and-device-verification.md:147` 的授权门、并同步改打包脚本、后验 gate 与 `apps/desktop/tests/unit/product-runtime-config.test.ts:178-194` 的断言。**纠正一处旧说法**：不是 12 条 fixture 全部有效到 2099——`syn-camp-002` 已于 2026-06-30 过期（`synthetic-scripts.ts:196`）。**覆盖 S0 全链的那条 E2E 不在默认 CI 门禁**（`.github/workflows/ci.yml:139` 只跑 `@windows-feasibility`），纳入按需门禁前这条路径没有回归保护。
 
 ### P4 · 远端后端 profile（含必须先做的鉴权）
 
@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 未授权
+**Status:** OPEN · 未授权 · **决策材料已就绪**（`docs/plans/2026-09-17-office-machine-delivery-path-decision.md`）。该路径评估经对抗性复核**未被反驳**，并补上两处漏列的必改点：(1) `apps/api/src/product-auth-service.ts:153` 硬编码 `auth_mode: 'mock'`，客户端 `apps/desktop/src/main/product-session.ts:41` 直接按 `'mock'` 收窄；(2) **服务端也有 loopback 硬编码**，不只在客户端——`apps/api/src/synthetic-identity-provider.ts:4-11`、`apps/api/src/runtime-config.ts:498-502`。
 
 ### P5 · 会话未绑定后端身份
 
@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 未开工
+**Status:** OPEN · 未开工 · **决策材料已就绪**（`docs/plans/2026-09-17-office-machine-delivery-path-decision.md`）。实证：这条路今天不可能直接落地——`scripts/synthetic-stack/postgres.ts:40-65` 的 PG15 发现只认 `CUSTOMER_AGENT_PG15_BIN` / `pg_config` / Homebrew 且**无 Windows 分支**，`scripts/synthetic-stack/profile.ts:93-98` 把配置写死到 macOS 的 `Library/Application Support`，`stack.ts:45-47` 依赖仓内 `apps/api/dist`，固定端口 43100/43101/43199 占用即 fail-closed，且本机 Homebrew PG15 依赖外部 dylib、**非自包含**，不能只拷 bin 目录。**它还把未澄清约束压到最强读法**：Windows 上 unix socket + `auth-local=trust` 必须改成 TCP loopback，会重新触发「本地监听」这一条。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 
