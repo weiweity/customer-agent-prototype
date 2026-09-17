@@ -7,6 +7,7 @@ describe('window role routing', () => {
     expect(isRendererRole('fox')).toBe(true);
     expect(isRendererRole('query')).toBe(true);
     expect(isRendererRole('dashboard')).toBe(true);
+    expect(isRendererRole('login')).toBe(true);
     expect(isRendererRole('admin')).toBe(false);
     expect(readRoleFromLocation('?role=fox')).toBe('fox');
     expect(readRoleFromLocation('?role=dashboard')).toBe('dashboard');

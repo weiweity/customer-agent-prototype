@@ -1,5 +1,6 @@
 import { DashboardApp } from './DashboardApp';
 import { FoxApp } from './FoxApp';
+import { LoginApp } from './LoginApp';
 import { QueryApp } from './QueryApp';
 import { readRoleFromLocation } from './lib/window-role';
 import type { RendererRole } from '@shared/overlay-events';
@@ -15,6 +16,9 @@ export function App({ role }: AppProps) {
   }
   if (resolved === 'dashboard') {
     return <DashboardApp />;
+  }
+  if (resolved === 'login') {
+    return <LoginApp />;
   }
   return <QueryApp />;
 }
