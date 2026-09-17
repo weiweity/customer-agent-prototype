@@ -256,7 +256,6 @@ export function SopApp({ projection: injected }: SopAppProps) {
                   script={projection.script}
                   copying={copying || projection.copied}
                   copied={projection.copied}
-                  allowInaccuracyReport={false}
                   onCopy={() => {
                     void copyCurrent();
                   }}
