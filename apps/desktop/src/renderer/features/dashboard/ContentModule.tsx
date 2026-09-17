@@ -100,8 +100,9 @@ export function ContentModule() {
       </ol>
 
       <p className="dash-scope dash-scope-important" data-testid="formal-source-warning">
-        正式来源现状：产品、活动已有受控材料，但四域整体签发尚未完成；售前、售后仍为
-        NOT_CREATED / UPSTREAM_AUTHORING。下列 release 仅演示“缺域即阻断”的产品合同，不代表正式四域已齐。
+        正式来源现状：产品、活动已有受控材料，但四域整体签发尚未完成。售前仍为
+        NOT_CREATED / UPSTREAM_AUTHORING。售后仅合成过敏树样例（DEMO），非正式签发，不接本页上传。
+        下列 release 仅演示“缺域即阻断”的产品合同，不代表正式四域已齐。
       </p>
 
       <section className="dash-card content-upload" data-testid="content-upload-panel" aria-labelledby="content-upload-title">

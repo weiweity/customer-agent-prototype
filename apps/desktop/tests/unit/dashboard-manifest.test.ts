@@ -151,6 +151,11 @@ describe('dashboard manifest', () => {
         .filter((item) => item.readiness === 'upstream_authoring')
         .map((item) => item.id),
     ).toEqual(['presale', 'aftersale']);
+    const aftersale = DASHBOARD_MANIFEST.wording.domains.find((item) => item.id === 'aftersale');
+    expect(aftersale?.readinessLabel).toBe('合成过敏树样例 · DEMO');
+    expect(aftersale?.sourceSummary).toContain('不提供树编辑');
+    expect(aftersale?.sourceSummary).toContain('内容与发布');
+    expect(aftersale?.sourceSummary).not.toMatch(/不提供树编辑或上传/u);
     expect(DASHBOARD_MANIFEST.wording.entries.every((entry) => entry.dataClass === 'synthetic')).toBe(true);
     expect(JSON.stringify(DASHBOARD_MANIFEST.wording)).not.toMatch(/customerText|order_id|image_url/i);
   });

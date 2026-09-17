@@ -783,7 +783,7 @@ export const DASHBOARD_MANIFEST = deepFreeze({
         label: '售后流程',
         readiness: 'upstream_authoring',
         readinessLabel: '合成过敏树样例 · DEMO',
-        sourceSummary: '合成过敏树样例 · DEMO。切片 1 不提供树编辑或上传。',
+        sourceSummary: '合成过敏树样例 · DEMO。切片 1 不提供树编辑；话术师 CSV 上传在「内容与发布」。',
       },
     ] as const,
     entries: [

@@ -1456,7 +1456,11 @@ describe('DashboardApp', () => {
     );
     expect(screen.getByTestId('content-upload-role-note')).toHaveTextContent('owner（管理员）');
     expect(screen.getByTestId('content-upload-boundary')).toHaveTextContent('不连接飞书或 Wiki');
+    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('售前仍为');
     expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('NOT_CREATED');
+    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('合成过敏树样例');
+    expect(screen.getByTestId('formal-source-warning')).toHaveTextContent('不接本页上传');
+    expect(screen.getByTestId('formal-source-warning')).not.toHaveTextContent('售前、售后仍为');
     expect(screen.getByTestId('content-aftersale-note')).toHaveTextContent('售后流程仍为合成样例');
     expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
