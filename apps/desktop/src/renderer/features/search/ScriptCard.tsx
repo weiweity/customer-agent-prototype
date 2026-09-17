@@ -1,3 +1,8 @@
+import { useState } from 'react';
+import {
+  SCRIPT_INACCURACY_ACTION_LABEL,
+  SCRIPT_INACCURACY_RECORDED_STATUS,
+} from './query-view';
 import { getValidityInfo } from './validity';
 import type { RankedScript, RiskLevel } from './types';
 
@@ -19,6 +24,8 @@ export function ScriptCard({ script, copying, copied, onCopy }: ScriptCardProps)
   const validity = script.productCopy ? { kind: validNow ? 'active' : 'expired', text: validNow ? '当前有效' : '已失效，请重新查询' } : getValidityInfo(script.effectiveFrom, script.effectiveTo);
   const risk = RISK_COPY[script.riskLevel];
   const lead = script.rank === 1;
+  const [inaccuracyReport, setInaccuracyReport] = useState<'recorded' | null>(null);
+  const reported = inaccuracyReport === 'recorded';
 
   return (
     <article
@@ -44,17 +51,37 @@ export function ScriptCard({ script, copying, copied, onCopy }: ScriptCardProps)
         <p className="answer-text" data-testid={`answer-text-${script.rank}`}>
           {script.answerText}
         </p>
-        <button
-          type="button"
-          className={copied ? 'copy-btn is-copied' : 'copy-btn'}
-          data-testid={`copy-button-${script.rank}`}
-          disabled={copying || (!!script.productCopy && !validNow)}
-          aria-keyshortcuts={String(script.rank)}
-          onClick={(event) => onCopy(script, event.currentTarget)}
-        >
-          {copied ? '已复制' : '复制话术'}
-        </button>
+        <div className="card-actions">
+          <button
+            type="button"
+            className={copied ? 'copy-btn is-copied' : 'copy-btn'}
+            data-testid={`copy-button-${script.rank}`}
+            disabled={copying || (!!script.productCopy && !validNow)}
+            aria-keyshortcuts={String(script.rank)}
+            onClick={(event) => onCopy(script, event.currentTarget)}
+          >
+            {copied ? '已复制' : '复制话术'}
+          </button>
+          <button
+            type="button"
+            className="retry-btn"
+            data-testid={`report-inaccuracy-button-${script.rank}`}
+            disabled={reported}
+            aria-pressed={reported}
+            onClick={() => {
+              // Local UI record only; not copyAdopt, help escalate, or backend persistence.
+              setInaccuracyReport('recorded');
+            }}
+          >
+            {SCRIPT_INACCURACY_ACTION_LABEL}
+          </button>
+        </div>
       </div>
+      {reported ? (
+        <span className="report-status" role="status" data-testid={`report-status-${script.rank}`}>
+          {SCRIPT_INACCURACY_RECORDED_STATUS}
+        </span>
+      ) : null}
       <div className="meta-row">
         <span className={`match-chip is-${script.matchKind}`} data-testid={`match-reason-${script.rank}`}>
           {script.matchLabel}
