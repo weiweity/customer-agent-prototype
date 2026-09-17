@@ -11,6 +11,7 @@ type ScriptCardProps = {
   copying: boolean;
   copied: boolean;
   onCopy: (script: RankedScript, trigger: HTMLButtonElement | null) => void;
+  allowInaccuracyReport?: boolean;
 };
 
 const RISK_COPY: Record<RiskLevel, { label: string; className: string }> = {
@@ -19,7 +20,7 @@ const RISK_COPY: Record<RiskLevel, { label: string; className: string }> = {
   high: { label: '高风险 · 需复核', className: 'risk-chip is-high' },
 };
 
-export function ScriptCard({ script, copying, copied, onCopy }: ScriptCardProps) {
+export function ScriptCard({ script, copying, copied, onCopy, allowInaccuracyReport = true }: ScriptCardProps) {
   const validNow = Date.parse(script.effectiveFrom) <= Date.now() && (!script.effectiveTo || Date.now() < Date.parse(script.effectiveTo));
   const validity = script.productCopy ? { kind: validNow ? 'active' : 'expired', text: validNow ? '当前有效' : '已失效，请重新查询' } : getValidityInfo(script.effectiveFrom, script.effectiveTo);
   const risk = RISK_COPY[script.riskLevel];
@@ -62,19 +63,21 @@ export function ScriptCard({ script, copying, copied, onCopy }: ScriptCardProps)
           >
             {copied ? '已复制' : '复制话术'}
           </button>
-          <button
-            type="button"
-            className="retry-btn"
-            data-testid={`report-inaccuracy-button-${script.rank}`}
-            disabled={reported}
-            aria-pressed={reported}
-            onClick={() => {
-              // Local UI record only; not copyAdopt, help escalate, or backend persistence.
-              setInaccuracyReport('recorded');
-            }}
-          >
-            {SCRIPT_INACCURACY_ACTION_LABEL}
-          </button>
+          {allowInaccuracyReport ? (
+            <button
+              type="button"
+              className="retry-btn"
+              data-testid={`report-inaccuracy-button-${script.rank}`}
+              disabled={reported}
+              aria-pressed={reported}
+              onClick={() => {
+                // Local UI record only; not copyAdopt, help escalate, or backend persistence.
+                setInaccuracyReport('recorded');
+              }}
+            >
+              {SCRIPT_INACCURACY_ACTION_LABEL}
+            </button>
+          ) : null}
         </div>
       </div>
       {reported ? (

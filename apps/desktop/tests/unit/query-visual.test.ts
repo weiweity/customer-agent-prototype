@@ -99,6 +99,7 @@ describe('query capsule visual contract', () => {
   it('keeps inaccuracy report as a hairline retry control, not the lavender copy CTA', () => {
     expect(queryApp).toContain('className="retry-btn"');
     expect(queryApp).toContain('data-testid={`report-inaccuracy-button-${script.rank}`}');
+    expect(queryApp).toContain('allowInaccuracyReport = true');
     expect(queryApp).toContain('SCRIPT_INACCURACY_ACTION_LABEL');
     expect(queryApp).toContain('SCRIPT_INACCURACY_RECORDED_STATUS');
     expect(css).toMatch(/\.retry-btn\s*\{[\s\S]*?background: transparent/);
