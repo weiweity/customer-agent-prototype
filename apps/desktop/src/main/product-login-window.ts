@@ -149,9 +149,9 @@ export function isChooserUrl(value: string, devServerUrl?: string): boolean {
     }
     if (url.protocol !== 'file:') return false;
     const path = decodeURIComponent(url.pathname).replace(/\\/g, '/');
-    if (path.includes('/..')) return false;
-    return /(?:^|\/)out\/renderer\/(?:index\.html|assets\/[^/]+)$/.test(path)
-      || /(?:^|\/)[^/]+\.asar\/(?:out\/)?renderer\/(?:index\.html|assets\/[^/]+)$/.test(path);
+    if (path.includes('/..') || path.includes('//')) return false;
+    return /(?:^|\/)out\/renderer\/(?:index\.html|assets\/(?:[^/]+\/)*[^/]+)$/.test(path)
+      || /(?:^|\/)[^/]+\.asar\/(?:out\/)?renderer\/(?:index\.html|assets\/(?:[^/]+\/)*[^/]+)$/.test(path);
   } catch { return false; }
 }
 

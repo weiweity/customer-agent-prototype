@@ -17,10 +17,12 @@ it('allows packaged renderer html and hashed assets, not parent-relative files',
   expect(isChooserUrl('file:///Users/app/out/renderer/assets/index-Bvsq1Vx8.js')).toBe(true);
   expect(isChooserUrl('file:///Users/app/out/renderer/assets/LoginApp-BzcsWSWI.js')).toBe(true);
   expect(isChooserUrl('file:///Users/app/out/renderer/assets/fox-head-DuCgrBSA.png')).toBe(true);
+  expect(isChooserUrl('file:///Users/app/out/renderer/assets/js/index-Bvsq1Vx8.js')).toBe(true);
   expect(isChooserUrl('file:///tmp/app.asar/out/renderer/index.html')).toBe(true);
   expect(isChooserUrl('file:///tmp/app.asar/out/renderer/assets/index.js')).toBe(true);
   expect(isChooserUrl('file:///tmp/app.asar/renderer/index.html')).toBe(true);
-  expect(isChooserUrl('file:///Users/app/out/renderer/assets/nested/index.js')).toBe(false);
+  expect(isChooserUrl('file:///tmp/app.asar/renderer/assets/js/index.js')).toBe(true);
+  expect(isChooserUrl('file:///Users/app/out/renderer/assets/%2e%2e%2fsecret.js')).toBe(false);
   expect(isChooserUrl('file:///tmp/token')).toBe(false);
   expect(isChooserUrl('file:///Users/app/out/main/index.js')).toBe(false);
   expect(isChooserUrl('http://127.0.0.1:5173/index.html')).toBe(false);
