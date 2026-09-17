@@ -1,9 +1,14 @@
+import { lazy, Suspense } from 'react';
 import { DashboardApp } from './DashboardApp';
 import { FoxApp } from './FoxApp';
-import { LoginApp } from './LoginApp';
 import { QueryApp } from './QueryApp';
 import { readRoleFromLocation } from './lib/window-role';
 import type { RendererRole } from '@shared/overlay-events';
+
+const LoginApp = lazy(async () => {
+  const module = await import('./LoginApp');
+  return { default: module.LoginApp };
+});
 
 type AppProps = {
   role?: RendererRole;
@@ -18,7 +23,11 @@ export function App({ role }: AppProps) {
     return <DashboardApp />;
   }
   if (resolved === 'login') {
-    return <LoginApp />;
+    return (
+      <Suspense fallback={null}>
+        <LoginApp />
+      </Suspense>
+    );
   }
   return <QueryApp />;
 }
