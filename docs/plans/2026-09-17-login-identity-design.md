@@ -1,6 +1,6 @@
 # 登录与身份设计（飞书 + 账号密码）
 
-> **状态：** 设计材料，**不含任何授权**。本文不批准实现、不改上游契约、不动 loopback 红线。
+> **状态：** 设计材料。第一刀（`auth_mode` 单一真相源 + 桌面接受 `mock|feishu`）已在本分支落地（`7d0e93c`）。本文**仍不批准**飞书 provider、打开 `AUTH_MODE=feishu` 启动门、改 loopback 红线或改上游契约。
 >
 > **日期：** 2026-09-17
 > **前提（已拍板）：** 办公机 Windows x64；允许出站到受控远端；首轮验完整产品会话链；接受「断网不可用」。
@@ -54,14 +54,14 @@
 | `apps/api/src/runtime-config.ts:493-503` | `SYNTHETIC_IDENTITY_PROVIDER_ORIGIN` 必须是精确 `http://127.0.0.1:<port>` |
 | `apps/api/src/synthetic-identity-provider.ts:4-11` | 提供方 origin 与回调 pathname 硬校验，飞书域连构造都过不了 |
 | `apps/api/src/server.ts:60-62` | 回调 URL 由 `config.host` 拼成，恒为 `127.0.0.1` |
-| `apps/api/src/product-auth-service.ts:151-153` | `auth_mode: 'mock'` 写死 |
+| `apps/api/src/product-auth-service.ts:151-154` | ~~`auth_mode: 'mock'` 写死~~ **第一刀已改**：改为组合根注入的 `authMode`；`AUTH_MODE=feishu` 启动门仍关 |
 | `apps/api/src/product-auth-service.ts:13-18` | 提供方适配器接口（`authorizeUrl` / `exchange` / `close`）；唯一实现 `synthetic-identity-provider.ts:4`，唯一构造点 `server.ts:59-62` |
 
 ### 桌面端
 
 | 位置 | 闸门 |
 |---|---|
-| `apps/desktop/src/main/product-session.ts:41-42` | `auth_mode !== 'mock'` 即抛 `UNAUTHORIZED`；`:42` 还把它 cast 成 `'mock'` |
+| `apps/desktop/src/main/product-session.ts:41-43` | ~~`auth_mode !== 'mock'` 即抛 `UNAUTHORIZED`~~ **第一刀已改**：接受 `['mock','feishu']`，未知值仍 fail-closed |
 | `apps/desktop/src/shared/product-session.ts:5` / `:37` | **已经接受 `['mock','feishu']`**——main 层比 shared 层更窄，是一处隐蔽的不一致，只 grep `'mock'` 很容易漏 |
 | `apps/desktop/src/main/product-login-window.ts:6-13` / `:14-15` | 精确 origin + 精确 pathname 白名单；`loopbackOrigin` 收紧 |
 | `apps/desktop/src/main/product-http.ts:7-15` | `loopbackOrigin` 实现，构造函数 `:24` 也调用它 |
@@ -125,6 +125,8 @@
 - **`/v1/auth/callback` 由服务端处理**，桌面端不接收任何重定向——这是本设计比 loopback 收码更安全的地方，不要在改造中丢掉。
 
 ## 8. 第一刀范围（已核实）
+
+> **落地：** `7d0e93c`（本分支，未合入 main）。运行期仍只能以 mock 启动；桌面端今天也拿不到 feishu。
 
 ### 现在就能做——不需要新授权、不需要真实飞书凭据
 
