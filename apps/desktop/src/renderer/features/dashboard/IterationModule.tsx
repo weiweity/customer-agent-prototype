@@ -27,7 +27,7 @@ const CAUSE_LABELS: Readonly<Record<IterationCause, string>> = {
   mixed: '待判',
 };
 
-const KICKER_CAUSE = '内容缺口、排序与过期召回分开处理';
+const KICKER_CAUSE = '内容缺口、排序、过期召回与待判分开处理';
 
 function statusFacetOf(status: IterationStatus): StatusFacet {
   return status === 'open' || status === 'in_progress' ? status : 'closed';
@@ -84,10 +84,11 @@ export function IterationModule() {
   // 详情独立于筛选：横幅点选后即使筛掉了该行，详情仍跟随选中项。
   const selected = tasks.find((task) => task.taskId === selectedId) ?? visible[0];
   const p0Open = listOpenP0IterationTasks(tasks);
-  const edited = tasks.some((task) => {
-    const source = data.tasks.find((item) => item.taskId === task.taskId);
-    return source ? isEdited(task, source) : false;
-  });
+  const edited =
+    tasks.some((task) => {
+      const source = data.tasks.find((item) => item.taskId === task.taskId);
+      return source ? isEdited(task, source) : false;
+    }) || data.tasks.some((task) => serverVersions[task.taskId] !== task.version);
 
   function selectTask(taskId: string) {
     const task = tasks.find((item) => item.taskId === taskId);
@@ -136,21 +137,24 @@ export function IterationModule() {
     setNote('');
   }
 
-  /** 把本行退回一个过期快照，演示真实 start / close 会因 expected_version 不符而 409。 */
-  function rollBackToStaleVersion(task: IterationTask) {
-    const stale = Math.max(1, (serverVersions[task.taskId] ?? task.version) - 1);
-    setTasks((current) =>
-      current.map((item) => (item.taskId === task.taskId ? { ...item, version: stale } : item)),
-    );
+  /** 服务端抢先 +1，客户端快照不动。真实 CAS 是 expected_version 落后，不是把本地 version 改小。 */
+  function simulateConcurrentUpdate(task: IterationTask) {
+    setServerVersions((current) => ({
+      ...current,
+      [task.taskId]: (current[task.taskId] ?? task.version) + 1,
+    }));
     setConflict('本条会话内版本已过期，可用于演示冲突');
+  }
+
+  function resetFilters() {
+    setStatus('all');
+    setCause('all');
+    setSelectedId(data.tasks[0]?.taskId ?? '');
   }
 
   function resetDrill() {
     setTasks(data.tasks);
     setServerVersions(initialServerVersions());
-    setStatus('all');
-    setCause('all');
-    setSelectedId(data.tasks[0]?.taskId ?? '');
     setNote('');
     setConflict(null);
   }
@@ -207,7 +211,6 @@ export function IterationModule() {
             data-testid="iteration-cause-filter"
             onChange={(event) => {
               setCause(event.target.value as IterationCause | 'all');
-              setSelectedId('');
             }}
           >
             <option value="all">全部根因</option>
@@ -223,7 +226,6 @@ export function IterationModule() {
             data-testid="iteration-status-filter"
             onChange={(event) => {
               setStatus(event.target.value as QueueStatusFilter);
-              setSelectedId('');
             }}
           >
             <option value="all">全部状态</option>
@@ -232,6 +234,9 @@ export function IterationModule() {
             ))}
           </select>
         </label>
+        <button type="button" className="dash-reset" data-testid="iteration-reset-filters" onClick={resetFilters}>
+          重置筛选
+        </button>
         <button type="button" className="dash-reset" data-testid="iteration-reset-drill" onClick={resetDrill}>
           重置演练
         </button>
@@ -291,24 +296,14 @@ export function IterationModule() {
               <div className="iteration-drill" data-testid="iteration-drill">
                 <h3>会话内演练</h3>
                 {selected.status === 'open' ? (
-                  <>
-                    <button
-                      type="button"
-                      className="dash-action-primary"
-                      data-testid="iteration-start"
-                      onClick={() => startTask(selected)}
-                    >
-                      开始处理
-                    </button>
-                    <button
-                      type="button"
-                      className="dash-reset"
-                      data-testid="iteration-stale-attempt"
-                      onClick={() => rollBackToStaleVersion(selected)}
-                    >
-                      退回旧版本快照
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    className="dash-action-primary"
+                    data-testid="iteration-start"
+                    onClick={() => startTask(selected)}
+                  >
+                    开始处理
+                  </button>
                 ) : null}
 
                 {selected.status === 'in_progress' ? (
@@ -344,6 +339,17 @@ export function IterationModule() {
                       暂不处理
                     </button>
                   </div>
+                ) : null}
+
+                {selected.status === 'open' || selected.status === 'in_progress' ? (
+                  <button
+                    type="button"
+                    className="dash-reset"
+                    data-testid="iteration-stale-attempt"
+                    onClick={() => simulateConcurrentUpdate(selected)}
+                  >
+                    演示版本冲突
+                  </button>
                 ) : null}
 
                 {selected.status === 'resolved' || selected.status === 'wont_fix' ? (

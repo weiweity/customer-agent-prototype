@@ -1699,12 +1699,12 @@ describe('DashboardApp', () => {
 
     await user.click(screen.getByTestId('nav-iteration'));
 
-    // 开始处理：open → in_progress，version +1，按钮换成结论表单。
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v3');
+    // 开始处理：open @ v1 → in_progress @ v2，按钮换成结论表单。
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
     expect(screen.queryByTestId('iteration-drill-state')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('iteration-start'));
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v4');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
     expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
 
     // 缺少结论时不能关闭。
@@ -1715,7 +1715,7 @@ describe('DashboardApp', () => {
 
     await user.click(screen.getByTestId('iteration-close-resolved'));
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('已处理');
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v5');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v3');
     expect(screen.getByTestId('iteration-terminal')).toHaveTextContent('终态不可再变更');
     expect(screen.getByTestId('iteration-terminal')).toHaveTextContent('已确认有效期过滤口径');
     expect(screen.queryByTestId('iteration-start')).not.toBeInTheDocument();
@@ -1727,28 +1727,66 @@ describe('DashboardApp', () => {
 
     // 重置演练恢复合成清单。
     await user.click(screen.getByTestId('iteration-reset-drill'));
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v3');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
     expect(screen.queryByTestId('iteration-drill-state')).not.toBeInTheDocument();
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('待处理');
   });
 
-  it('reports a refresh prompt when the drill snapshot holds a stale version', async () => {
+  it('reports a refresh prompt when the server version moves ahead of the client snapshot', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
 
     await user.click(screen.getByTestId('nav-iteration'));
     expect(screen.queryByTestId('iteration-conflict')).not.toBeInTheDocument();
+    expect(screen.getByTestId('iteration-stale-attempt')).toHaveTextContent('演示版本冲突');
 
     await user.click(screen.getByTestId('iteration-stale-attempt'));
     await user.click(screen.getByTestId('iteration-start'));
 
     expect(screen.getByTestId('iteration-conflict')).toHaveTextContent('待办已更新，请刷新后再处理');
-    // 冲突不落地：状态与版本都不变。
+    // 冲突不落地：客户端快照仍是 open @ v1。
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('待处理');
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
+    expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
 
     await user.click(screen.getByTestId('iteration-reset-drill'));
     expect(screen.queryByTestId('iteration-conflict')).not.toBeInTheDocument();
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v3');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
+  });
+
+  it('rejects close when the server version moved ahead during in_progress', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+
+    await user.click(screen.getByTestId('nav-iteration'));
+    await user.click(screen.getByTestId('iteration-start'));
+    await user.type(screen.getByTestId('iteration-note'), '已核对有效期过滤');
+    await user.click(screen.getByTestId('iteration-stale-attempt'));
+    await user.click(screen.getByTestId('iteration-close-resolved'));
+
+    expect(screen.getByTestId('iteration-conflict')).toHaveTextContent('待办已更新，请刷新后再处理');
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
+    expect(screen.queryByTestId('iteration-terminal')).not.toBeInTheDocument();
+  });
+
+  it('resets filters without wiping an in-memory drill', async () => {
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+
+    await user.click(screen.getByTestId('nav-iteration'));
+    await user.click(screen.getByTestId('iteration-start'));
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+
+    await user.selectOptions(screen.getByTestId('iteration-status-filter'), 'closed');
+    expect(screen.queryByTestId('iteration-it-2041')).not.toBeInTheDocument();
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+
+    await user.click(screen.getByTestId('iteration-reset-filters'));
+    expect(screen.getByTestId('iteration-status-filter')).toHaveValue('all');
+    expect(screen.getByTestId('iteration-it-2041')).toBeInTheDocument();
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
+    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
+    expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
   });
 });

@@ -283,6 +283,16 @@ describe('dashboard manifest', () => {
       expect(task.signalId.length).toBeGreaterThan(0);
       expect(task.clusterKey.length).toBeGreaterThan(0);
       expect(task.version).toBeGreaterThanOrEqual(1);
+      if (task.status === 'open') expect(task.version).toBe(1);
+      if (task.status === 'in_progress') expect(task.version).toBe(2);
+      if (task.status === 'resolved' || task.status === 'wont_fix') {
+        expect(task.version).toBe(3);
+        expect(task.resolution).toBe(task.status);
+        expect(task.resolutionNote && task.resolutionNote.length).toBeGreaterThan(0);
+      } else {
+        expect(task.resolution).toBeNull();
+        expect(task.resolutionNote).toBeNull();
+      }
       expect(task.suggestedScriptIds.every((id) => id.startsWith('syn-'))).toBe(true);
       expect(task.sampleQueryIds.every((id) => id.startsWith('q-syn-'))).toBe(true);
       ids.add(task.taskId);
