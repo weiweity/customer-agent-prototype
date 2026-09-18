@@ -5,7 +5,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: p0stgr3s
+      POSTGRES_HOST_AUTH_METHOD: trust
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 2s
@@ -22,6 +22,6 @@ services:
       - '127.0.0.1:3002:3002'
     environment:
       TRUST_PROXY_HEADER: '1'
-      DB_URL: postgres://postgres:p0stgr3s@postgres:5432/logto
+      DB_URL: postgres://postgres@postgres:5432/logto
       ENDPOINT: http://127.0.0.1:3001
       ADMIN_ENDPOINT: http://127.0.0.1:3002
