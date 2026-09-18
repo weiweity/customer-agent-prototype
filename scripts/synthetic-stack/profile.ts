@@ -235,12 +235,11 @@ export function apiEnvironment(
     DB_CONNECTION_TIMEOUT_MS: '2000',
     DB_READINESS_TIMEOUT_MS: '3000',
   };
+  environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN = profile.identityOrigin;
   if (feishu) {
     environment.FEISHU_APP_ID = feishu.clientId;
     environment.FEISHU_APP_SECRET = feishu.clientSecret;
     environment.FEISHU_REDIRECT_URI = feishu.redirectUri;
-  } else {
-    environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN = profile.identityOrigin;
   }
   return { ...environment, ...overrides };
 }

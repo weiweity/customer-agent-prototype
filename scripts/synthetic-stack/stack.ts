@@ -141,19 +141,16 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
 
   try {
     const feishu = loadFeishuStackConfig();
-    if (!feishu) {
-      if (!live.has('identity')) {
-        const pid = spawnLogged('identity', process.execPath, [IDENTITY_ENTRY, String(profile.identityPort)],
-          { PATH: process.env.PATH });
-        spawned.push('identity');
-        started.push(`identity pid ${String(pid)}`);
-      } else {
-        started.push('identity already running');
-      }
-      await waitForHttp(`${profile.identityOrigin}/health`, { timeoutMs: 15_000 });
+    if (!live.has('identity')) {
+      const pid = spawnLogged('identity', process.execPath, [IDENTITY_ENTRY, String(profile.identityPort)],
+        { PATH: process.env.PATH });
+      spawned.push('identity');
+      started.push(`identity pid ${String(pid)}`);
     } else {
-      started.push(`feishu identity: ${feishu.clientId} → ${feishu.redirectUri}`);
+      started.push('identity already running');
     }
+    await waitForHttp(`${profile.identityOrigin}/health`, { timeoutMs: 15_000 });
+    if (feishu) started.push(`feishu identity: ${feishu.clientId} → ${feishu.redirectUri} (account password still loopback)`);
 
     const environment = apiEnvironment(profile, {
       CONTENT_INTENT_TAXONOMY_VERSION: 'itax_synthetic_stack_v1',
@@ -329,12 +326,11 @@ async function commandStatus(): Promise<void> {
   const feishu = loadFeishuStackConfig();
   if (feishu) {
     log(`feishu: AUTH_MODE=feishu app ${feishu.clientId} redirect ${feishu.redirectUri} bindings ${String(feishu.bindings.length)}`);
-  } else {
-    try {
-      log(`identity /health: ${JSON.stringify(await readJson(`${profile.identityOrigin}/health`))}`);
-    } catch (error) {
-      log(`identity probe failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  }
+  try {
+    log(`identity /health: ${JSON.stringify(await readJson(`${profile.identityOrigin}/health`))}`);
+  } catch (error) {
+    log(`identity probe failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

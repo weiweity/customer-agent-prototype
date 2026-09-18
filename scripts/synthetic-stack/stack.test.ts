@@ -74,7 +74,7 @@ describe('stack profile', () => {
     assert.equal(environment.AUTH_MODE, 'mock');
   });
 
-  it('switches the API to feishu without a synthetic identity origin or leaked secrets in logs', () => {
+  it('switches the API to feishu and keeps the loopback account origin', () => {
     const profile = {
       version: 1, createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
       apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
@@ -93,7 +93,7 @@ describe('stack profile', () => {
     const environment = apiEnvironment(profile, {}, feishu);
     assert.equal(environment.AUTH_MODE, 'feishu');
     assert.equal(environment.FEISHU_REDIRECT_URI, 'https://oauth.test.invalid/v1/auth/callback');
-    assert.equal(environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN, undefined);
+    assert.equal(environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN, 'http://127.0.0.1:43101');
     assert.equal(environment.CUSTOMER_AGENT_API_HOST, '127.0.0.1');
     assert.throws(() => parseFeishuEnvFile('AUTH_MODE=feishu\nFEISHU_APP_ID=cli_aaaaaaaaaaaaaaaa\nFEISHU_APP_SECRET=test-feishu-secret-material-0001\nFEISHU_REDIRECT_URI=http://127.0.0.1:43100/v1/auth/callback\n'), /FEISHU_REDIRECT_URI/);
   });

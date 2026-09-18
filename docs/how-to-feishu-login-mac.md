@@ -23,7 +23,7 @@
 
 ## 本机文件
 
-路径：`~/.customer-agent-synthetic-stack/feishu.env`（`chmod 600`）。有这个文件时，`stack.ts start` 把 API 设成 `AUTH_MODE=feishu`，**不再**起合成 identity。
+路径：`~/.customer-agent-synthetic-stack/feishu.env`（`chmod 600`）。有这个文件时，`stack.ts start` 把 API 设成 `AUTH_MODE=feishu`，**同时保留** 合成 identity：飞书走官方授权，账号仍走本机管理员口令。
 
 ```
 AUTH_MODE=feishu
@@ -39,9 +39,9 @@ FEISHU_BINDINGS=ou_你的open_id:agent
 
 1. 写好 `feishu.env`，隧道已转到 `43100`。
 2. **先停** 当前 mock 栈（`node scripts/synthetic-stack/stack.ts stop`），再 `start`。不要叠两套 API。
-3. `stack.ts status` 应看到 `AUTH_MODE=feishu` 和 app id，**没有** identity `/health`。
+3. `stack.ts status` 应看到 `AUTH_MODE=feishu`、app id，以及 identity `/health` 仍 ok。
 4. 桌面仍用 loopback：`CUSTOMER_AGENT_DESKTOP_API_ORIGIN=http://127.0.0.1:43100`。点「飞书登录」应打开系统浏览器到 `accounts.feishu.cn`。
-5. 「账号」段在真飞书模式下没有合成 `/password`，会失败。这是预期。
+5. 「账号」仍可用管理员下发的合成口令（用户名是 `synthetic_agent` 等绑定，密码是本机非机密 `synthetic-password`）。没有飞书的人走账号，有飞书的人走飞书。界面只写飞书 / 账号。
 
 ## 明确不做
 
