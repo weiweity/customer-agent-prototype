@@ -12,9 +12,8 @@ import { routeQuery, type QueryRoute } from '../shared/query-route.ts';
 import { admitRetrieval } from '../shared/retrieval-quality.ts';
 import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index.ts';
 import type { RetrievalScript } from '../shared/hybrid-retrieve.ts';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
+import { DEFAULT_RETRIEVAL_PREFERENCE_PATH } from './packaged-retrieval-paths.ts';
 import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog.ts';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
 import { createRetrievalPipeline, loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
@@ -111,8 +110,8 @@ export class ProductSearch {
     private readonly rerank: Reranker | null = loadMinimaxReranker(),
     private readonly pipeline: RetrievalPipeline = loadRetrievalPipeline(),
     private readonly preference: RetrievalPreferenceStore = loadRetrievalPreferenceStore(
-      process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE
-        ?? join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-preference.json'),
+      (process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE ?? '').trim()
+        || DEFAULT_RETRIEVAL_PREFERENCE_PATH,
     ),
     private readonly telemetry: RetrievalTelemetry = loadRetrievalTelemetryStore(),
   ) {

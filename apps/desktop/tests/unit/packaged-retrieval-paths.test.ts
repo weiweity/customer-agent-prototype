@@ -11,6 +11,7 @@ import {
   resolveRetrievalStackFile,
   resolveStackFile,
 } from '../../src/main/packaged-retrieval-paths';
+import { loadRetrievalPreferenceStore } from '../../src/main/retrieval-preference-store';
 
 const directories: string[] = [];
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -70,6 +71,8 @@ describe('packaged retrieval defaults', () => {
   it('applies defaults after the product profile and before search IPC', () => {
     const main = readFileSync(path.join(desktopRoot, 'src/main/main.ts'), 'utf8');
     expect(main).toContain('applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin })');
+    const searchIpc = readFileSync(path.join(desktopRoot, 'src/main/product-search-ipc.ts'), 'utf8');
+    expect(searchIpc).not.toMatch(/^const preferenceStore = loadRetrievalPreferenceStore/m);
     expect(main).not.toContain('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);');
     expect(main.indexOf('applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin })'))
       .toBeGreaterThan(main.indexOf('resolveProductProfile(app.isPackaged, userDataDirectory, process.env)'));
@@ -108,5 +111,31 @@ describe('packaged retrieval defaults', () => {
     expect(env.CUSTOMER_AGENT_EMBEDDING_INDEX).toBe(
       originKeyedStackFile('retrieval-embeddings.json', 'https://agent-auth.jianghua.site', home),
     );
+    expect(env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE).toBe(
+      originKeyedStackFile('retrieval-preference.json', 'https://agent-auth.jianghua.site', home),
+    );
+  });
+
+  it('keeps smart-retrieval toggles from two API origins in separate files', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-pref-'));
+    directories.push(home);
+    mkdirSync(path.join(home, '.customer-agent-synthetic-stack'));
+    const local = 'http://127.0.0.1:43100';
+    const remote = 'https://agent-auth.jianghua.site';
+    const localEnv: NodeJS.ProcessEnv = {};
+    const remoteEnv: NodeJS.ProcessEnv = {};
+    applyPackagedRetrievalDefaults(localEnv, { apiOrigin: local, home });
+    applyPackagedRetrievalDefaults(remoteEnv, { apiOrigin: remote, home });
+    expect(localEnv.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE).not.toBe(
+      remoteEnv.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE,
+    );
+    loadRetrievalPreferenceStore(localEnv.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE!).write({ smartEnabled: false });
+    loadRetrievalPreferenceStore(remoteEnv.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE!).write({ smartEnabled: true });
+    expect(loadRetrievalPreferenceStore(localEnv.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE!).read()).toEqual({
+      smartEnabled: false,
+    });
+    expect(loadRetrievalPreferenceStore(remoteEnv.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE!).read()).toEqual({
+      smartEnabled: true,
+    });
   });
 });

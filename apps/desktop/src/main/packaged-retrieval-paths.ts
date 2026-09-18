@@ -35,6 +35,7 @@ export function resolveRetrievalStackFile(
 export const DEFAULT_RETRIEVAL_INDEX_PATH = defaultSyntheticStackFile('retrieval-index.json');
 export const DEFAULT_HYDRATE_INDEX_PATH = defaultSyntheticStackFile('retrieval-hydrate.json');
 export const DEFAULT_EMBEDDING_INDEX_PATH = defaultSyntheticStackFile('retrieval-embeddings.json');
+export const DEFAULT_RETRIEVAL_PREFERENCE_PATH = defaultSyntheticStackFile('retrieval-preference.json');
 
 /**
  * Product-mode startup (packaged or `pnpm dev` with loopback origins) must not
@@ -48,6 +49,7 @@ export function applyPackagedRetrievalDefaults(
     hydrate?: string;
     index?: string;
     embeddings?: string;
+    preference?: string;
     apiOrigin?: string;
     home?: string;
   } = {},
@@ -67,14 +69,24 @@ export function applyPackagedRetrievalDefaults(
     paths.apiOrigin,
     paths.home,
   );
+  const preference = paths.preference ?? resolveRetrievalStackFile(
+    'retrieval-preference.json',
+    paths.apiOrigin,
+    paths.home,
+  );
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_HYDRATE_INDEX', hydrate, Boolean(paths.apiOrigin));
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_RETRIEVAL_INDEX', index, Boolean(paths.apiOrigin));
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_EMBEDDING_INDEX', embeddings, Boolean(paths.apiOrigin));
+  assignRetrievalEnv(env, 'CUSTOMER_AGENT_RETRIEVAL_PREFERENCE', preference, Boolean(paths.apiOrigin));
 }
 
 function assignRetrievalEnv(
   env: NodeJS.ProcessEnv,
-  key: 'CUSTOMER_AGENT_HYDRATE_INDEX' | 'CUSTOMER_AGENT_RETRIEVAL_INDEX' | 'CUSTOMER_AGENT_EMBEDDING_INDEX',
+  key:
+    | 'CUSTOMER_AGENT_HYDRATE_INDEX'
+    | 'CUSTOMER_AGENT_RETRIEVAL_INDEX'
+    | 'CUSTOMER_AGENT_EMBEDDING_INDEX'
+    | 'CUSTOMER_AGENT_RETRIEVAL_PREFERENCE',
   path: string,
   isolate: boolean,
 ): void {
