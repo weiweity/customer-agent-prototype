@@ -96,26 +96,28 @@ describe('API runtime configuration', () => {
     expect(config).not.toHaveProperty('DATABASE_URL');
   });
 
-  it('accepts feishu when provider credentials are complete and keeps secrets out of public config', () => {
+  it('accepts feishu when the OIDC broker is complete and keeps secrets out of public config', () => {
     const config = parseApiRuntimeConfig({
       CUSTOMER_AGENT_PROFILE: 'formal-dev',
       AUTH_MODE: 'feishu',
-      FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
-      FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
-      FEISHU_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',
+      OIDC_ISSUER: 'http://127.0.0.1:3001/oidc',
+      OIDC_CLIENT_ID: 'logto_client_1',
+      OIDC_CLIENT_SECRET: 'test-oidc-secret-material-0001',
+      OIDC_REDIRECT_URI: 'http://127.0.0.1:43100/v1/auth/callback',
     });
     expect(config.authMode).toBe('feishu');
-    expect(config).not.toHaveProperty('FEISHU_APP_SECRET');
-    expect(JSON.stringify(config)).not.toContain('test-feishu-secret-material-0001');
+    expect(config).not.toHaveProperty('OIDC_CLIENT_SECRET');
+    expect(JSON.stringify(config)).not.toContain('test-oidc-secret-material-0001');
     expectConfigIssue(
       {
         CUSTOMER_AGENT_PROFILE: 'formal-dev',
         AUTH_MODE: 'feishu',
-        FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
-        FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
-        FEISHU_REDIRECT_URI: 'http://127.0.0.1:3100/v1/auth/callback',
+        OIDC_ISSUER: 'http://127.0.0.1:3001/oidc',
+        OIDC_CLIENT_ID: 'logto_client_1',
+        OIDC_CLIENT_SECRET: 'test-oidc-secret-material-0001',
+        OIDC_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',
       },
-      'FEISHU_REDIRECT_URI',
+      'OIDC_REDIRECT_URI',
       'invalid',
     );
   });
@@ -239,24 +241,30 @@ describe('synthetic product identity bootstrap', () => {
     expect(() => parseApiRuntimeConfig({ ...environment, AUTH_MODE: 'feishu' })).toThrow(ApiConfigError);
   });
 
-  it('bootstraps a feishu product identity without a synthetic provider origin', () => {
+  it('bootstraps an OIDC broker identity without a synthetic provider origin', () => {
     const config = parseApiPrivateBootstrapConfig({
       ...environment,
       AUTH_MODE: 'feishu',
       SYNTHETIC_IDENTITY_PROVIDER_ORIGIN: undefined,
-      FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
-      FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
-      FEISHU_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',
+      OIDC_ISSUER: 'http://127.0.0.1:3001/oidc',
+      OIDC_CLIENT_ID: 'logto_client_1',
+      OIDC_CLIENT_SECRET: 'test-oidc-secret-material-0001',
+      OIDC_REDIRECT_URI: 'http://127.0.0.1:43100/v1/auth/callback',
     });
     expect(config.productIdentity).toMatchObject({
-      kind: 'feishu',
-      feishu: { clientId: 'cli_aaaaaaaaaaaaaaaa', redirectUri: 'https://oauth.test.invalid/v1/auth/callback' },
+      kind: 'oidc',
+      oidc: {
+        issuer: 'http://127.0.0.1:3001/oidc',
+        clientId: 'logto_client_1',
+        redirectUri: 'http://127.0.0.1:43100/v1/auth/callback',
+      },
     });
     expect(parseApiRuntimeConfig({
       CUSTOMER_AGENT_PROFILE: 'formal-dev', AUTH_MODE: 'feishu', AUTH_SESSION_MODE: 'product',
-      FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
-      FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
-      FEISHU_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',
+      OIDC_ISSUER: 'http://127.0.0.1:3001/oidc',
+      OIDC_CLIENT_ID: 'logto_client_1',
+      OIDC_CLIENT_SECRET: 'test-oidc-secret-material-0001',
+      OIDC_REDIRECT_URI: 'http://127.0.0.1:43100/v1/auth/callback',
     }).authMode).toBe('feishu');
   });
 

@@ -19,6 +19,7 @@ export function allowedLoginUrl(value: string, provider: string, api: string): b
     const url = new URL(value);
     return !url.username && !url.password && !url.hash
       && ((url.origin === provider && url.pathname === '/authorize')
+        || (url.origin === provider && url.pathname === '/oidc/auth')
         || (url.origin === api && url.pathname === '/v1/auth/callback')
         || isFeishuAuthorize(url));
   } catch { return false; }
@@ -27,6 +28,14 @@ export function allowedLoginUrl(value: string, provider: string, api: string): b
 export function isFeishuAuthorize(url: URL): boolean {
   return url.protocol === 'https:' && url.hostname === FEISHU_AUTHORIZE_HOST
     && url.pathname === '/open-apis/authen/v1/authorize';
+}
+
+export function isOidcAuthorize(url: URL, provider: string): boolean {
+  try {
+    return url.origin === provider && url.pathname === '/oidc/auth';
+  } catch {
+    return false;
+  }
 }
 
 /** One allowlisted hop only. Used by DEMO_E2E instead of unrestricted redirect:follow. */
@@ -144,7 +153,7 @@ export function createLoginWindow(
           if (event.sender !== window.webContents) return;
           cancel();
         });
-        void loadChooser(window, 'entry', devServerUrl?.()).then(() => { if (!closed && !window.isDestroyed()) window.show(); })
+        void loadChooser(window, 'entry', devServerUrl?.(), url).then(() => { if (!closed && !window.isDestroyed()) window.show(); })
           .catch(() => finish(new ProductHttpError('UNAVAILABLE')));
       });
     },
@@ -212,20 +221,30 @@ async function verifySyntheticPassword(
   }
 }
 
-async function loadChooser(window: BrowserWindow, loginState: 'entry' | 'failed' | 'cancelled', devServerUrl?: string) {
+async function loadChooser(
+  window: BrowserWindow,
+  loginState: 'entry' | 'failed' | 'cancelled',
+  devServerUrl?: string,
+  authorizeUrl?: string,
+) {
+  const broker = authorizeUrl ? (() => {
+    try { return new URL(authorizeUrl).pathname === '/oidc/auth'; } catch { return false; }
+  })() : false;
   if (devServerUrl) {
     const target = new URL(devServerUrl);
     target.searchParams.set('role', 'login');
     target.searchParams.set('platform', process.platform);
     if (loginState !== 'entry') target.searchParams.set('loginState', loginState);
+    if (broker) target.searchParams.set('loginKind', 'broker');
     await window.loadURL(target.href);
     return;
   }
   await loadRenderer(window, 'login');
-  if (loginState !== 'entry' && !window.isDestroyed()) {
+  if (!window.isDestroyed() && (loginState !== 'entry' || broker)) {
     const current = window.webContents.getURL();
     const next = new URL(current);
-    next.searchParams.set('loginState', loginState);
+    if (loginState !== 'entry') next.searchParams.set('loginState', loginState);
+    if (broker) next.searchParams.set('loginKind', 'broker');
     await window.loadURL(next.href);
   }
 }

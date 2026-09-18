@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
-  DESKTOP_PACKAGED_PROFILE_PATH, PID_DIRECTORY, apiEnvironment, readProfile,
+  DESKTOP_PACKAGED_PROFILE_PATH, PID_DIRECTORY, apiEnvironment, parseOidcEnvFile, readProfile,
 } from './profile.ts';
 import {
   forgetProcess, isAlive, isOwnedProcessLive, portInUse, processSignature, readProcess, recordProcess, stopProcess,
@@ -71,6 +71,28 @@ describe('stack profile', () => {
     assert.ok(logins.every((login) => login.startsWith('stack_')));
     assert.notEqual(environment.IDEMPOTENCY_HMAC_KEYS, undefined);
     assert.notEqual(environment.LOG_HASH_KEY, undefined);
+  });
+
+  it('points the API at a loopback OIDC broker instead of Feishu app secrets', () => {
+    const profile = {
+      version: 1, createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
+      apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
+      apiPort: 43100, identityPort: 43101, databaseName: 'db', pgPort: 43199,
+      pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
+    } as const;
+    const oidc = parseOidcEnvFile([
+      'AUTH_MODE=feishu',
+      'OIDC_ISSUER=http://127.0.0.1:3001/oidc',
+      'OIDC_CLIENT_ID=logto_client_1',
+      'OIDC_CLIENT_SECRET=test-oidc-secret-material-0001',
+      'OIDC_REDIRECT_URI=http://127.0.0.1:43100/v1/auth/callback',
+      'OIDC_BINDINGS=user_contractor_1:agent',
+    ].join('\n'));
+    const environment = apiEnvironment(profile, {}, oidc);
+    assert.equal(environment.AUTH_MODE, 'feishu');
+    assert.equal(environment.OIDC_ISSUER, 'http://127.0.0.1:3001/oidc');
+    assert.equal(environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN, undefined);
+    assert.equal(environment.CUSTOMER_AGENT_API_HOST, '127.0.0.1');
   });
 
   it('writes only loopback origins to the packaged desktop profile', () => {

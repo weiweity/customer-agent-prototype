@@ -47,11 +47,18 @@ export type FeishuProviderBootstrap = Readonly<{
   redirectUri: string;
 }>;
 
+export type OidcProviderBootstrap = Readonly<{
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}>;
+
 export type ProductIdentityBootstrap = Readonly<{
   database: ApiDatabaseBootstrapConfig;
 } & (
   | { kind: 'synthetic'; providerOrigin: string }
-  | { kind: 'feishu'; feishu: FeishuProviderBootstrap }
+  | { kind: 'oidc'; oidc: OidcProviderBootstrap }
 )>;
 
 /** Private, process-local capability configuration. It must never cross the composition root. */
@@ -164,6 +171,63 @@ function validFeishuRedirectUri(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function validOidcIssuer(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' && url.hostname === '127.0.0.1' && Boolean(url.port)
+      && Number(url.port) >= 1024 && !url.username && !url.password && url.pathname === '/oidc'
+      && url.search === '' && url.hash === '';
+  } catch {
+    return false;
+  }
+}
+
+function validOidcRedirectUri(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' && url.hostname === '127.0.0.1' && Boolean(url.port)
+      && Number(url.port) >= 1024 && !url.username && !url.password
+      && url.pathname === '/v1/auth/callback' && url.search === '' && url.hash === '';
+  } catch {
+    return false;
+  }
+}
+
+function parseOidcProviderConfig(
+  environment: ApiRuntimeEnvironment,
+  issues: ApiConfigIssue[],
+): OidcProviderBootstrap | undefined {
+  if (environment.OIDC_ISSUER === undefined
+    || environment.OIDC_CLIENT_ID === undefined
+    || environment.OIDC_CLIENT_SECRET === undefined
+    || environment.OIDC_REDIRECT_URI === undefined) return undefined;
+  const issuer = exactEnvironmentValue(environment, 'OIDC_ISSUER', issues);
+  const clientId = exactEnvironmentValue(environment, 'OIDC_CLIENT_ID', issues);
+  const clientSecret = exactEnvironmentValue(environment, 'OIDC_CLIENT_SECRET', issues);
+  const redirectUri = exactEnvironmentValue(environment, 'OIDC_REDIRECT_URI', issues);
+  let ok = true;
+  if (issuer !== undefined && !validOidcIssuer(issuer)) {
+    issues.push(issue('OIDC_ISSUER', 'invalid'));
+    ok = false;
+  }
+  if (clientId !== undefined && (clientId.length < 8 || clientId.length > 128)) {
+    issues.push(issue('OIDC_CLIENT_ID', 'invalid'));
+    ok = false;
+  }
+  if (clientSecret !== undefined && (clientSecret.length < 16 || clientSecret.length > 128)) {
+    issues.push(issue('OIDC_CLIENT_SECRET', 'invalid'));
+    ok = false;
+  }
+  if (redirectUri !== undefined && !validOidcRedirectUri(redirectUri)) {
+    issues.push(issue('OIDC_REDIRECT_URI', 'invalid'));
+    ok = false;
+  }
+  if (!ok || issuer === undefined || clientId === undefined || clientSecret === undefined || redirectUri === undefined) {
+    return undefined;
+  }
+  return Object.freeze({ issuer, clientId, clientSecret, redirectUri });
 }
 
 function parseFeishuProviderConfig(
@@ -481,10 +545,10 @@ export function parseApiRuntimeConfig(
   }
 
   if (authMode === 'feishu') {
-    const feishuIssues: ApiConfigIssue[] = [];
-    const feishu = parseFeishuProviderConfig(environment, feishuIssues);
-    if (feishuIssues.length > 0) issues.push(...feishuIssues);
-    else if (!feishu) issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
+    const oidcIssues: ApiConfigIssue[] = [];
+    const oidc = parseOidcProviderConfig(environment, oidcIssues);
+    if (oidcIssues.length > 0) issues.push(...oidcIssues);
+    else if (!oidc) issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
   } else if (authMode && authMode !== 'mock') {
     issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
   }
@@ -549,12 +613,12 @@ export function parseApiPrivateBootstrapConfig(
       connectionString: 'AUTH_DATABASE_URL', poolMax: 'AUTH_DB_POOL_MAX', defaultPoolMax: 2,
     }, issues);
     if (environment.AUTH_MODE === 'feishu') {
-      const feishuIssues: ApiConfigIssue[] = [];
-      const feishu = parseFeishuProviderConfig(environment, feishuIssues);
-      if (feishuIssues.length > 0) issues.push(...feishuIssues);
-      else if (!feishu) issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
-      if (database && feishu && feishuIssues.length === 0) {
-        productIdentity = Object.freeze({ kind: 'feishu', database, feishu });
+      const oidcIssues: ApiConfigIssue[] = [];
+      const oidc = parseOidcProviderConfig(environment, oidcIssues);
+      if (oidcIssues.length > 0) issues.push(...oidcIssues);
+      else if (!oidc) issues.push(issue('AUTH_MODE', 'auth_mode_not_available'));
+      if (database && oidc && oidcIssues.length === 0) {
+        productIdentity = Object.freeze({ kind: 'oidc', database, oidc });
       }
     } else {
       let providerOrigin: string | undefined;

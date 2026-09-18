@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 // `pnpm build:services`.
 import { applyDatabaseMigrations } from '../../packages/database/dist/index.js';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SOURCES } from './content.ts';
-import { SYNTHETIC_IDENTITIES } from './profile.ts';
+import { SYNTHETIC_IDENTITIES, type OidcStackBinding } from './profile.ts';
 import { SEED_INTENT } from './seed.ts';
 
 const CAPABILITIES: readonly (readonly [string, string])[] = Object.freeze([
@@ -90,6 +90,20 @@ export async function seedReferenceData(client): Promise<string> {
   }
 
   return `reference data: ${String(SYNTHETIC_SOURCES.length)} sources, ${String(SYNTHETIC_IDENTITIES.length)} identities`;
+}
+
+/** Broker subjects. provider=feishu is the frozen CHECK; tenant=broker marks the identity proxy. */
+export async function seedOidcBindings(client, bindings: readonly OidcStackBinding[]): Promise<string> {
+  for (const binding of bindings) {
+    const userId = `usr_${binding.subject}`.slice(0, 128);
+    await client.query(`
+      INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+      VALUES ($1,'feishu','broker',$1,$2,$3,true,$4)
+      ON CONFLICT (binding_id) DO UPDATE SET provider='feishu', tenant='broker', subject=EXCLUDED.subject,
+        user_id=EXCLUDED.user_id, subject_hash=EXCLUDED.subject_hash, enabled=true, role=EXCLUDED.role
+    `, [binding.subject, userId, sha256(binding.subject), binding.role]);
+  }
+  return `oidc bindings: ${bindings.length === 0 ? 'none' : bindings.map((binding) => binding.subject).join(', ')}`;
 }
 
 export async function bootstrapDatabase(client): Promise<readonly string[]> {

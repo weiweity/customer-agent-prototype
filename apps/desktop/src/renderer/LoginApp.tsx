@@ -8,9 +8,14 @@ function readChooserState(search = window.location.search): LoginChooserState {
   return value === 'loading' || value === 'waiting' || value === 'failed' || value === 'cancelled' ? value : 'entry';
 }
 
+function readLoginKind(search = window.location.search): 'broker' | 'synthetic' {
+  return new URLSearchParams(search).get('loginKind') === 'broker' ? 'broker' : 'synthetic';
+}
+
 export function LoginApp() {
   const [audience, setAudience] = useState<LoginAudience>('feishu');
   const [state, setState] = useState<LoginChooserState>(readChooserState);
+  const loginKind = readLoginKind();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -64,7 +69,7 @@ export function LoginApp() {
 
       {state === 'loading' ? (
         <>
-          <p className="login-copy">{audience === 'account' ? '正在验证账号…' : '正在打开浏览器…'}</p>
+          <p className="login-copy">{audience === 'account' && loginKind !== 'broker' ? '正在验证账号…' : '正在打开浏览器…'}</p>
           <div className="login-actions">
             <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
           </div>
@@ -99,11 +104,15 @@ export function LoginApp() {
             <button type="button" className="login-segment" aria-pressed={audience === 'account'} disabled={busy}
               onClick={() => { setAudience('account'); setInvalid(false); }}>账号</button>
           </div>
-          {audience === 'feishu' ? (
+          {audience === 'feishu' || loginKind === 'broker' ? (
             <>
-              <p className="login-copy">将用浏览器打开飞书登录。</p>
+              <p className="login-copy">{audience === 'account'
+                ? '将用浏览器打开账号登录。'
+                : '将用浏览器打开飞书登录。'}</p>
               <div className="login-actions">
-                <button type="button" className="login-primary" autoFocus disabled={busy} onClick={() => void chooseFeishu()}>飞书登录</button>
+                <button type="button" className="login-primary" autoFocus disabled={busy} onClick={() => void chooseFeishu()}>
+                  {audience === 'account' ? '账号登录' : '飞书登录'}
+                </button>
                 <button type="button" className="login-cancel" disabled={busy} onClick={() => void window.loginWindow?.cancel()}>取消</button>
               </div>
             </>

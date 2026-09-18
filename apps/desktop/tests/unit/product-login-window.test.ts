@@ -73,6 +73,7 @@ beforeEach(() => {
 it('allows only configured authorization and callback routes, not arbitrary loopback targets', () => {
   const check = (url: string) => allowedLoginUrl(url, 'http://127.0.0.1:4201', 'http://127.0.0.1:4200');
   expect(check('http://127.0.0.1:4201/authorize?state=s')).toBe(true);
+  expect(check('http://127.0.0.1:4201/oidc/auth?state=s')).toBe(true);
   expect(check('http://127.0.0.1:4200/v1/auth/callback?state=s&code=c')).toBe(true);
   expect(check('https://accounts.feishu.cn/open-apis/authen/v1/authorize?client_id=cli_aaaaaaaaaaaaaaaa')).toBe(true);
   const credentialUrl = new URL('http://127.0.0.1:4201/authorize');

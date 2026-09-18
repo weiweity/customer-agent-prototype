@@ -1,0 +1,27 @@
+# Local Logto broker. Demo-grade compose from Logto OSS; not a production IdP.
+# https://github.com/logto-io/logto/blob/master/docker-compose.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: p0stgr3s
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 5s
+      retries: 20
+  app:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    image: svhd/logto:latest
+    entrypoint: ['sh', '-c', 'npm run cli db seed -- --swe && npm start']
+    ports:
+      - '127.0.0.1:3001:3001'
+      - '127.0.0.1:3002:3002'
+    environment:
+      TRUST_PROXY_HEADER: '1'
+      DB_URL: postgres://postgres:p0stgr3s@postgres:5432/logto
+      ENDPOINT: http://127.0.0.1:3001
+      ADMIN_ENDPOINT: http://127.0.0.1:3002

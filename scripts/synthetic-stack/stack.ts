@@ -27,11 +27,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { catalogReferences } from '../../apps/desktop/src/shared/synthetic-catalog.ts';
 import { SYNTHETIC_SCRIPT_IDS } from './content.ts';
-import { bootstrapDatabase } from './bootstrap.ts';
+import { bootstrapDatabase, seedOidcBindings } from './bootstrap.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
   PREFERRED_PORTS, PROFILE_FILE, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
-  readProfile, writeDesktopPackagedProfile, writeProfile,
+  loadOidcStackConfig, readProfile, writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
 import {
   SyntheticCluster, clusterVersionText, ensureDatabase, ensureLoginRoles, writeClusterMarker,
@@ -140,15 +140,20 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
   };
 
   try {
-    if (!live.has('identity')) {
-      const pid = spawnLogged('identity', process.execPath, [IDENTITY_ENTRY, String(profile.identityPort)],
-        { PATH: process.env.PATH });
-      spawned.push('identity');
-      started.push(`identity pid ${String(pid)}`);
+    const oidc = loadOidcStackConfig();
+    if (!oidc) {
+      if (!live.has('identity')) {
+        const pid = spawnLogged('identity', process.execPath, [IDENTITY_ENTRY, String(profile.identityPort)],
+          { PATH: process.env.PATH });
+        spawned.push('identity');
+        started.push(`identity pid ${String(pid)}`);
+      } else {
+        started.push('identity already running');
+      }
+      await waitForHttp(`${profile.identityOrigin}/health`, { timeoutMs: 15_000 });
     } else {
-      started.push('identity already running');
+      started.push(`oidc broker: ${oidc.issuer}`);
     }
-    await waitForHttp(`${profile.identityOrigin}/health`, { timeoutMs: 15_000 });
 
     const environment = apiEnvironment(profile, {
       CONTENT_INTENT_TAXONOMY_VERSION: 'itax_synthetic_stack_v1',
@@ -156,7 +161,7 @@ async function startProcesses(profile: StackProfile): Promise<string[]> {
       CONTENT_REVIEW_LEAD_SUBJECT: 'synthetic_coach',
       CONTENT_REVIEW_MANAGER_SUBJECT: 'synthetic_owner',
       CONTENT_REVIEW_EVIDENCE_ID: 'EVD-STACK-REVIEW-001',
-    });
+    }, oidc);
 
     if (!live.has('api')) {
       const pid = spawnLogged('api', process.execPath, [API_ENTRY], environment);
@@ -258,6 +263,8 @@ async function commandStart(): Promise<void> {
   await database.connect();
   try {
     for (const step of await bootstrapDatabase(database)) log(step);
+    const oidc = loadOidcStackConfig();
+    if (oidc) log(await seedOidcBindings(database, oidc.bindings));
   } finally { await database.end(); }
 
   log(await ensureLoginRoles(cluster));
@@ -283,9 +290,11 @@ async function commandStart(): Promise<void> {
 }
 
 function desktopCommand(profile: StackProfile): string {
+  const oidc = loadOidcStackConfig();
+  const identityOrigin = oidc ? new URL(oidc.issuer).origin : profile.identityOrigin;
   return [
     `CUSTOMER_AGENT_DESKTOP_API_ORIGIN=${profile.apiOrigin}`,
-    `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN=${profile.identityOrigin}`,
+    `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN=${identityOrigin}`,
     'pnpm dev',
   ].join(' ');
 }
@@ -319,6 +328,8 @@ async function commandStatus(): Promise<void> {
   } catch (error) {
     log(`api probe failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+  const oidc = loadOidcStackConfig();
+  if (oidc) log(`oidc broker: ${oidc.issuer} bindings ${String(oidc.bindings.length)}`);
   try {
     log(`identity /health: ${JSON.stringify(await readJson(`${profile.identityOrigin}/health`))}`);
   } catch (error) {
