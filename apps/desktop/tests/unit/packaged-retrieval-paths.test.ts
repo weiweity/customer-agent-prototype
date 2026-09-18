@@ -105,5 +105,8 @@ describe('packaged retrieval defaults', () => {
     expect(env.CUSTOMER_AGENT_RETRIEVAL_INDEX).toBe(
       originKeyedStackFile('retrieval-index.json', 'https://agent-auth.jianghua.site', home),
     );
+    expect(env.CUSTOMER_AGENT_EMBEDDING_INDEX).toBe(
+      originKeyedStackFile('retrieval-embeddings.json', 'https://agent-auth.jianghua.site', home),
+    );
   });
 });

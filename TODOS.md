@@ -111,7 +111,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 本机路径已冻结。P7 续刀：hydrate / BM25 按 `apiOrigin` 哈希分文件（与会话相同），未带后缀的旧文件仍可回退。多公司 PG 分库未做。见 `docs/plans/2026-09-19-p7-origin-keyed-retrieval.md`。
+**Status:** 本机路径已冻结。P7 续刀：hydrate / BM25 / embeddings 按 `apiOrigin` 哈希分文件。多公司 PG 分库未做。
 
 ### P8 · Windows DRAFT 与启动代码冲突
 

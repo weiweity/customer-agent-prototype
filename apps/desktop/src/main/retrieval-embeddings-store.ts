@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
+import { dirname } from 'node:path';
 import {
   answerContentHash,
   matchingDenseRows,
@@ -17,8 +16,9 @@ import type { RetrievalScript } from '../shared/hybrid-retrieve.ts';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
 import { EMBED_BATCH, minimaxEmbed, type EmbedKind } from './minimax-embed.ts';
 import type { MinimaxChatOptions } from './minimax-chat.ts';
+import { DEFAULT_EMBEDDING_INDEX_PATH } from './packaged-retrieval-paths.ts';
 
-export const DEFAULT_EMBED_PATH = join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-embeddings.json');
+export const DEFAULT_EMBED_PATH = DEFAULT_EMBEDDING_INDEX_PATH;
 
 export type DenseQueryRanker = Readonly<{
   rank(query: string, scripts: readonly RetrievalScript[], signal?: AbortSignal): Promise<readonly DenseRank[] | null>;
