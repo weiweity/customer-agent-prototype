@@ -46,6 +46,9 @@ export class ProductAnnounce implements AnnounceGate {
     return !!this.lease && view.signedIn && view.sessionEpoch === this.lease.epoch
       && this.lease.releaseId === releaseId && this.now() < Date.parse(this.lease.expiresAt);
   }
+  currentReleaseId() {
+    return this.lease?.releaseId ?? null;
+  }
   private projection(identity: QueryIdentity): ProductAnnounceResult {
     if (!this.lease) return announceFailure('SOURCE_GATE_NOT_READY', identity);
     return { ok: true, ...identity, releaseId: this.lease.releaseId, releaseSeq: this.lease.releaseSeq,

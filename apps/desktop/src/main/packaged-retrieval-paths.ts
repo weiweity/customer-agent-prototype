@@ -26,3 +26,12 @@ export function applyPackagedRetrievalDefaults(
   if (existsSync(paths.hydrate)) env.CUSTOMER_AGENT_HYDRATE_INDEX = paths.hydrate;
   if (existsSync(paths.index)) env.CUSTOMER_AGENT_RETRIEVAL_INDEX = paths.index;
 }
+
+/** Empty string stays empty so tests can opt out. Unset falls back to an existing stack file. */
+export function resolveStackFile(explicit: string | undefined, fallback: string): string | undefined {
+  if (explicit !== undefined) {
+    const trimmed = explicit.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  return existsSync(fallback) ? fallback : undefined;
+}

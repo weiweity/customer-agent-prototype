@@ -981,7 +981,7 @@ export function QueryApp() {
         reportPhase('RESULTS', outcome.results.length as ResultCount);
       } catch {
         setResults([]);
-        setErrorMessage('本地检索失败，请重试。当前 Demo 未连接外部服务。');
+        setErrorMessage('本地检索失败，请重试。');
         reportPhase('ERROR');
       } finally {
         if (generation === searchGenerationRef.current) {
@@ -1011,7 +1011,7 @@ export function QueryApp() {
       const api = window.customerAgent;
       const resultCount = results.length as ResultCount;
       if (!api) {
-        setErrorMessage('复制通道不可用，请在桌面 Demo 中重试');
+        setErrorMessage('复制通道不可用，请重试');
         reportPhase('ERROR', resultCount);
         copyInFlightRef.current = false;
         return;
@@ -1546,7 +1546,7 @@ export function QueryApp() {
         <QueryCapsule
           productControl={window.customerAgent?.product && !(productState?.ok && !productState.enabled) ? (
             <button type="button" className="capsule-session-entry" disabled={sessionBusy} onClick={() => { void sessionAction(); }}
-              title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '仅使用合成身份'}>
+              title={productState?.ok && productState.signedIn ? `身份 ${productState.role} · 到期 ${productState.expiresAt}` : '登录后查询话术'}>
               {sessionBusy ? '处理中' : productState?.ok && productState.signedIn ? `${productState.role} · 退出` : SESSION_ENTRY_UNSIGNED_LABEL}
             </button>
           ) : null}
@@ -1593,11 +1593,7 @@ export function QueryApp() {
             {shortcutHint || '全局快捷键注册失败，请点击狐狸头打开。'}
           </p>
         ) : null}
-        {announce ? (
-          <p className="product-announce-banner" data-testid="announce-banner" role="status">
-            版本 {announce.releaseSeq} · {announce.announcement?.title ?? '当前发布'} · 只读核验，ACK 不是已读
-          </p>
-        ) : announceInvalid ? (
+        {announceInvalid ? (
           <p className="product-announce-banner is-invalid" data-testid="announce-banner" role="status">
             当前版本已失效，请重新核验
           </p>

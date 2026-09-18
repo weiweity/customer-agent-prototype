@@ -195,7 +195,6 @@ describe('QueryApp', () => {
   }
   async function prepareProductQuery() {
     render(<QueryApp />); await screen.findByRole('button', { name: 'agent · 退出' });
-    await screen.findByTestId('announce-banner');
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(window.customerAgent!.productSearch!.search).toHaveBeenCalled());
@@ -204,7 +203,7 @@ describe('QueryApp', () => {
     const f = connectProduct();
     render(<QueryApp />);
     await screen.findByRole('button', { name: 'agent · 退出' });
-    await screen.findByTestId('announce-banner');
+    expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
     await screen.findByTestId('copy-button-1');
@@ -243,19 +242,23 @@ describe('QueryApp', () => {
   it('clears candidates when the current announcement is invalidated', async () => {
     const f = connectProduct(); await prepareProductQuery(); fireEvent.click(screen.getByTestId('search-button'));
     await screen.findByTestId('copy-button-1');
-    expect(screen.getByTestId('announce-banner')).toHaveTextContent('ACK 不是已读');
+    expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
     await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'expired' })); });
     expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
     expect(screen.getByText('当前版本已失效，请重新核验')).toBeInTheDocument();
     expect(screen.queryByText('已读')).not.toBeInTheDocument();
+    const refresh = window.customerAgent!.productAnnounce!.refresh as ReturnType<typeof vi.fn>;
+    refresh.mockClear();
     fireEvent.click(screen.getByTestId('retry-button'));
-    await screen.findByTestId('announce-banner');
-    expect(window.customerAgent!.productAnnounce!.refresh).toHaveBeenCalled();
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(screen.queryByText('ACK 不是已读')).not.toBeInTheDocument();
   });
   it('keeps an idle signed-in overlay on the announce slot when the lease expires', async () => {
     const f = connectProduct();
     render(<QueryApp />);
-    expect(await screen.findByTestId('announce-banner')).toHaveTextContent('ACK 不是已读');
+    await screen.findByRole('button', { name: 'agent · 退出' });
+    expect(screen.queryByText('ACK 不是已读')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
     await act(async () => { f.invalidate.forEach(listener => listener({ sessionEpoch: 10, reason: 'expired' })); });
     expect(screen.getByTestId('announce-banner')).toHaveTextContent('当前版本已失效，请重新核验');
     expect(screen.getByTestId('announce-banner')).toHaveClass('is-invalid');
@@ -404,7 +407,8 @@ describe('QueryApp', () => {
     render(<QueryApp />);
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
     await screen.findByRole('button', { name: 'agent · 退出' });
-    expect(await screen.findByTestId('announce-banner')).toHaveTextContent('版本 18 · 合成栈种子发布 · 只读核验，ACK 不是已读');
+    expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
+    expect(screen.queryByText('ACK 不是已读')).not.toBeInTheDocument();
     expect(screen.queryByText('查询未完成')).not.toBeInTheDocument();
     expect(screen.queryByText('当前版本已失效，请重新核验')).not.toBeInTheDocument();
   });
@@ -795,7 +799,6 @@ describe('QueryApp', () => {
     f.search.mockImplementationOnce(() => pending.promise);
     render(<QueryApp />);
     await screen.findByRole('button', { name: 'agent · 退出' });
-    await screen.findByTestId('announce-banner');
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(f.search).toHaveBeenCalled());
@@ -815,7 +818,6 @@ describe('QueryApp', () => {
     window.customerAgent!.productSearch!.setRetrievalPreference = vi.fn(() => pending.promise);
     render(<QueryApp />);
     await screen.findByRole('button', { name: 'agent · 退出' });
-    await screen.findByTestId('announce-banner');
     fireEvent.click(screen.getByTestId('deep-thinking-toggle'));
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
