@@ -1,9 +1,16 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { applyPackagedRetrievalDefaults, defaultSyntheticStackFile, resolveStackFile } from '../../src/main/packaged-retrieval-paths';
+import {
+  applyPackagedRetrievalDefaults,
+  defaultSyntheticStackFile,
+  originKeyedStackFile,
+  resolveRetrievalStackFile,
+  resolveStackFile,
+} from '../../src/main/packaged-retrieval-paths';
 
 const directories: string[] = [];
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -62,11 +69,41 @@ describe('packaged retrieval defaults', () => {
 
   it('applies defaults after the product profile and before search IPC', () => {
     const main = readFileSync(path.join(desktopRoot, 'src/main/main.ts'), 'utf8');
-    expect(main).toContain('applyPackagedRetrievalDefaults(process.env);');
+    expect(main).toContain('applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin })');
     expect(main).not.toContain('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);');
-    expect(main.indexOf('applyPackagedRetrievalDefaults(process.env);'))
+    expect(main.indexOf('applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin })'))
       .toBeGreaterThan(main.indexOf('resolveProductProfile(app.isPackaged, userDataDirectory, process.env)'));
-    expect(main.indexOf('applyPackagedRetrievalDefaults(process.env);'))
+    expect(main.indexOf('applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin })'))
       .toBeLessThan(main.indexOf('registerProductSearchIpc('));
+  });
+
+  it('keeps the same origin key as the session file and isolates catalogs', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-home-'));
+    directories.push(home);
+    mkdirSync(path.join(home, '.customer-agent-synthetic-stack'));
+    const local = 'http://127.0.0.1:43100';
+    const remote = 'https://agent-auth.jianghua.site';
+    const sessionId = createHash('sha256').update(local).digest('hex').slice(0, 16);
+    expect(originKeyedStackFile('retrieval-hydrate.json', local, home)).toContain(sessionId);
+    const unkeyed = defaultSyntheticStackFile('retrieval-hydrate.json', home);
+    writeFileSync(unkeyed, '{}\n');
+    expect(resolveRetrievalStackFile('retrieval-hydrate.json', remote, home)).toBe(unkeyed);
+    const keyed = originKeyedStackFile('retrieval-hydrate.json', remote, home);
+    writeFileSync(keyed, '{}\n');
+    expect(resolveRetrievalStackFile('retrieval-hydrate.json', remote, home)).toBe(keyed);
+    expect(resolveRetrievalStackFile('retrieval-hydrate.json', local, home)).toBe(unkeyed);
+  });
+
+  it('points unset env at origin-keyed paths so login cannot overwrite another catalog', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-isolate-'));
+    directories.push(home);
+    const env: NodeJS.ProcessEnv = {};
+    applyPackagedRetrievalDefaults(env, { apiOrigin: 'https://agent-auth.jianghua.site', home });
+    expect(env.CUSTOMER_AGENT_HYDRATE_INDEX).toBe(
+      originKeyedStackFile('retrieval-hydrate.json', 'https://agent-auth.jianghua.site', home),
+    );
+    expect(env.CUSTOMER_AGENT_RETRIEVAL_INDEX).toBe(
+      originKeyedStackFile('retrieval-index.json', 'https://agent-auth.jianghua.site', home),
+    );
   });
 });

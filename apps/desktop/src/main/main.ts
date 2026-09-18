@@ -198,7 +198,7 @@ if (!gotLock) {
     );
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
-      applyPackagedRetrievalDefaults(process.env);
+      applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin });
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
         createSessionStore(userDataDirectory, productProfile.apiOrigin), createLoginWindow(
           productProfile.identityOrigin,
