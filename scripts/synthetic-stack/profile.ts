@@ -233,6 +233,8 @@ export function apiEnvironment(
     LOG_HASH_KEY_VERSION: 'hmac-log-v1',
     DB_CONNECTION_TIMEOUT_MS: '2000',
     DB_READINESS_TIMEOUT_MS: '3000',
+    // Homebrew Node 24 does not trust Feishu's DigiCert chain unless we point at the macOS CA bundle.
+    ...(existsSync('/etc/ssl/cert.pem') ? { NODE_EXTRA_CA_CERTS: process.env.NODE_EXTRA_CA_CERTS ?? '/etc/ssl/cert.pem' } : {}),
   };
   if (feishu) {
     environment.FEISHU_APP_ID = feishu.clientId;
