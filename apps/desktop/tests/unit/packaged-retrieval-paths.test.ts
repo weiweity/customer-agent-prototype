@@ -50,12 +50,13 @@ describe('packaged retrieval defaults', () => {
     );
   });
 
-  it('applies defaults after the packaged profile and before search IPC', () => {
+  it('applies defaults after the product profile and before search IPC', () => {
     const main = readFileSync(path.join(desktopRoot, 'src/main/main.ts'), 'utf8');
-    expect(main).toContain('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);');
-    expect(main.indexOf('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);'))
+    expect(main).toContain('applyPackagedRetrievalDefaults(process.env);');
+    expect(main).not.toContain('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);');
+    expect(main.indexOf('applyPackagedRetrievalDefaults(process.env);'))
       .toBeGreaterThan(main.indexOf('resolveProductProfile(app.isPackaged, userDataDirectory, process.env)'));
-    expect(main.indexOf('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);'))
+    expect(main.indexOf('applyPackagedRetrievalDefaults(process.env);'))
       .toBeLessThan(main.indexOf('registerProductSearchIpc('));
   });
 });
