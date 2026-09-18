@@ -9,6 +9,7 @@ All notable changes to this customer-agent product implementation repository are
 - Feishu login opens in the system browser. The 520×420 window stays a 飞书 / 账号 chooser. With off-repo `feishu.env`, you can complete official Feishu OAuth as `owner` (or another allowlisted role); account login uses the hashed loopback password server. See `docs/how-to-feishu-and-password-mac.md`.
 - Cancelling the chooser after the browser opens stops the desktop login instead of still exchanging a session.
 - Packaged and unpackaged desktop can use a `product-remote` HTTPS origin (no IP, no public HTTP, no userinfo). The API still binds `127.0.0.1`. Session files are keyed by API origin. See `docs/how-to-p4-remote-mac.md`.
+- On Windows, collapsing Query yields the previous app by hiding the idle fox for one frame, then `showInactive`. It does not call `app.hide()` or `app.focus({ steal: true })`. Not a Windows device pass. See `docs/plans/2026-09-19-windows-yield-focus.md`.
 
 ## [0.3.3] - 2026-09-18
 
