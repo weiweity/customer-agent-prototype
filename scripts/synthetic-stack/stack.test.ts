@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
-  DESKTOP_PACKAGED_PROFILE_PATH, PID_DIRECTORY, apiEnvironment, readProfile,
+  DESKTOP_PACKAGED_PROFILE_PATH, PID_DIRECTORY, apiEnvironment, parseFeishuEnvFile, readProfile,
 } from './profile.ts';
 import {
   forgetProcess, isAlive, isOwnedProcessLive, portInUse, processSignature, readProcess, recordProcess, stopProcess,
@@ -71,6 +71,31 @@ describe('stack profile', () => {
     assert.ok(logins.every((login) => login.startsWith('stack_')));
     assert.notEqual(environment.IDEMPOTENCY_HMAC_KEYS, undefined);
     assert.notEqual(environment.LOG_HASH_KEY, undefined);
+    assert.equal(environment.AUTH_MODE, 'mock');
+  });
+
+  it('switches the API to feishu without a synthetic identity origin or leaked secrets in logs', () => {
+    const profile = {
+      version: 1, createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
+      apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
+      apiPort: 43100, identityPort: 43101, databaseName: 'db', pgPort: 43199,
+      pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
+    } as const;
+    const feishu = parseFeishuEnvFile([
+      'AUTH_MODE=feishu',
+      'FEISHU_APP_ID=cli_aaaaaaaaaaaaaaaa',
+      'FEISHU_APP_SECRET=test-feishu-secret-material-0001',
+      'FEISHU_REDIRECT_URI=https://oauth.test.invalid/v1/auth/callback',
+      'FEISHU_BINDINGS=ou_abcdef:agent,ou_ghijkl:owner',
+    ].join('\n'));
+    assert.equal(feishu.clientId, 'cli_aaaaaaaaaaaaaaaa');
+    assert.equal(feishu.bindings.length, 2);
+    const environment = apiEnvironment(profile, {}, feishu);
+    assert.equal(environment.AUTH_MODE, 'feishu');
+    assert.equal(environment.FEISHU_REDIRECT_URI, 'https://oauth.test.invalid/v1/auth/callback');
+    assert.equal(environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN, undefined);
+    assert.equal(environment.CUSTOMER_AGENT_API_HOST, '127.0.0.1');
+    assert.throws(() => parseFeishuEnvFile('AUTH_MODE=feishu\nFEISHU_APP_ID=cli_aaaaaaaaaaaaaaaa\nFEISHU_APP_SECRET=test-feishu-secret-material-0001\nFEISHU_REDIRECT_URI=http://127.0.0.1:43100/v1/auth/callback\n'), /FEISHU_REDIRECT_URI/);
   });
 
   it('writes only loopback origins to the packaged desktop profile', () => {
