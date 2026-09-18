@@ -90,10 +90,11 @@ describe('IPC whitelist', () => {
   });
 
   it('keeps the dashboard wording preload free of shared overlay modules', () => {
-    expect(dashboardPreload).not.toContain("from '../shared/ipc-channels'");
+    expect(dashboardPreload).not.toContain("from '../shared/");
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_WORDING_LIST}'`);
     expect(dashboardPreload).not.toContain('product:search');
     expect(dashboardPreload).not.toContain('product:login');
+    expect(dashboardPreload).not.toContain("from '../shared/product-session'");
   });
 
   it('keeps the SOP preload free of shared overlay modules', () => {

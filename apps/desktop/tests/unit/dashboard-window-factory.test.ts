@@ -42,7 +42,9 @@ describe('dashboard BrowserWindow factory', () => {
 
     expect(created).toBeDefined();
     expect(mocks.BrowserWindow).toHaveBeenCalledOnce();
-    const options = mocks.BrowserWindow.mock.calls[0]?.[0];
+    const options = mocks.BrowserWindow.mock.calls[0]?.[0] as {
+      webPreferences?: { preload?: string };
+    } | undefined;
     expect(options).toMatchObject({
       frame: true,
       transparent: false,
