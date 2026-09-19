@@ -920,7 +920,7 @@ export function QueryApp() {
         sessionEpoch, generation, queryText, platform: 'all', platformSource: 'manual',
         productContextType: null, productContextRef: null, productUnscoped: false, parentQueryId: null,
       }));
-      const run = window.customerAgent.productAnnounce && !announce
+      const run = window.customerAgent.productAnnounce
         ? refreshAnnounce(sessionEpoch).then(result => { if (!result?.ok || generation !== searchGenerationRef.current) return null; return search(); })
         : search();
       void run.then(result => {
@@ -1012,7 +1012,7 @@ export function QueryApp() {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [announce, cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce]);
 
   const copyScript = useCallback(
     async (script: RankedScript, trigger: HTMLButtonElement | null = null) => {
