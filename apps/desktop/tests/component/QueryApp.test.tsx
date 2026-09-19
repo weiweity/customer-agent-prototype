@@ -156,7 +156,7 @@ describe('QueryApp', () => {
   });
 
   function connectProduct(options: { noHit?: boolean } = {}) {
-    const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString() };
+    const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString(), displayName: 'synthetic' };
     window.customerAgent!.product = { sessionStatus: vi.fn().mockResolvedValue(view), login: vi.fn().mockResolvedValue(view), logout: vi.fn(), onSessionChanged: () => () => {} };
     const search = vi.fn(async (r: import('../../src/shared/product-search').ProductSearchRequest) => ({
       ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, queryId: '11111111-1111-4111-8111-111111111111',
@@ -174,7 +174,7 @@ describe('QueryApp', () => {
       retrievalPreference: vi.fn(async () => ({ smartEnabled: true })),
       setRetrievalPreference: vi.fn(async (next) => next),
     };
-    const invalidate: Array<(value: { sessionEpoch: number; reason: 'expired' }) => void> = [];
+    const invalidate: Array<(value: { sessionEpoch: number; reason: 'expired' | 'replaced' | 'signed_out' | 'unavailable' | 'source_gate' }) => void> = [];
     window.customerAgent!.productAnnounce = {
       refresh: vi.fn(async r => ({ ok: true as const, sessionEpoch: r.sessionEpoch, generation: r.generation, releaseId: 'rel-synthetic', releaseSeq: 13,
         leaseExpiresAt: new Date(Date.now() + 600_000).toISOString(), announcement: { title: '合成公告', summary: '只读', createdAt: '2026-09-09T00:00:00.000Z' } })),
@@ -336,8 +336,8 @@ describe('QueryApp', () => {
   });
 
   it('blocks fixture search in product mode and exposes login/logout without credentials', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
-    const signedIn = { ...signedOut, signedIn: true, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedIn = { ...signedOut, signedIn: true, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedOut),
       login: vi.fn()
@@ -371,7 +371,7 @@ describe('QueryApp', () => {
   });
 
   it('shows the release banner after login instead of a failed query', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
     const signedIn = {
       ...signedOut,
       signedIn: true,
@@ -380,9 +380,10 @@ describe('QueryApp', () => {
       role: 'agent' as const,
       authMode: 'mock' as const,
       expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      displayName: 'synthetic_agent',
     };
     let sessionListener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
-    const invalidate: Array<(value: { sessionEpoch: number; reason: 'signed_out' | 'expired' | 'unavailable' }) => void> = [];
+    const invalidate: Array<(value: { sessionEpoch: number; reason: 'signed_out' | 'expired' | 'unavailable' | 'replaced' | 'source_gate' }) => void> = [];
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedOut),
       login: vi.fn().mockImplementation(async () => {
@@ -433,8 +434,8 @@ describe('QueryApp', () => {
   });
 
   it('distinguishes expiry and login failure from unsigned guidance', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
-    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 8, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 8, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     let listener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedIn),
@@ -479,8 +480,8 @@ describe('QueryApp', () => {
 
   it('ignores delayed old session events without clearing current UI', async () => {
     const pending = deferred<import('../../src/shared/product-session').ProductSessionResult>();
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null };
-    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 3, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString() };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 3, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     let listener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
     window.customerAgent!.product = { sessionStatus: () => pending.promise, login: vi.fn().mockResolvedValue(signedIn), logout: vi.fn().mockResolvedValue(signedOut), onSessionChanged: handler => { listener = handler; return () => {}; } };
     render(<QueryApp />);
@@ -1653,6 +1654,7 @@ describe('QueryApp', () => {
       role: null,
       authMode: null,
       expiresAt: null,
+      displayName: null,
     };
     const signedIn = {
       ...signedOut,
@@ -1662,6 +1664,7 @@ describe('QueryApp', () => {
       role: 'agent' as const,
       authMode: 'mock' as const,
       expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      displayName: 'synthetic_agent',
     };
     const pending = deferred<typeof signedIn>();
     const login = vi.fn().mockReturnValue(pending.promise);
@@ -1693,6 +1696,7 @@ describe('QueryApp', () => {
       role: null,
       authMode: null,
       expiresAt: null,
+      displayName: null,
     };
     const signedIn = {
       ...signedOut,
@@ -1702,6 +1706,7 @@ describe('QueryApp', () => {
       role: 'agent' as const,
       authMode: 'mock' as const,
       expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      displayName: 'synthetic_agent',
     };
     const pending = deferred<typeof signedIn>();
     const login = vi.fn().mockReturnValue(pending.promise);
@@ -1734,6 +1739,7 @@ describe('QueryApp', () => {
       role: null,
       authMode: null,
       expiresAt: null,
+      displayName: null,
     };
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedOut),
