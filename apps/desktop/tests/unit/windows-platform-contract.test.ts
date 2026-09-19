@@ -48,9 +48,11 @@ const stackProfile = readFileSync(
 
 describe('Windows local-unsigned packaging contract', () => {
   it('writes the packaged profile into Windows %APPDATA% userData, not macOS Application Support', () => {
-    expect(stackProfile).toContain("process.platform === 'win32'");
+    expect(stackProfile).toContain("platform === 'win32'");
     expect(stackProfile).toContain("'AppData', 'Roaming'");
     expect(stackProfile).toContain('DESKTOP_APP_NAME');
+    expect(stackProfile).toContain('XDG_CONFIG_HOME');
+    expect(stackProfile).toContain('desktopPackagedProfilePath');
     const verifyDesktop = readFileSync(path.join(repositoryRoot, 'docs/how-to-verify-desktop.md'), 'utf8');
     const p4 = readFileSync(path.join(repositoryRoot, 'docs/how-to-p4-remote-mac.md'), 'utf8');
     expect(verifyDesktop).toContain('%APPDATA%\\客服话术浮窗 Demo');
@@ -75,6 +77,8 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(mergeOrder).toContain('feat/p10-linux-e2e-deps');
     expect(mergeOrder).toContain('cfc4bed');
     expect(mergeOrder).toContain('feat/p10-linux-ci-artifact');
+    expect(mergeOrder).toContain('9a1b519');
+    expect(mergeOrder).toContain('feat/p10-linux-xdg-userdata');
     const remoteOffice = readFileSync(
       path.join(repositoryRoot, 'docs/how-to-office-machine-product-remote.md'),
       'utf8',

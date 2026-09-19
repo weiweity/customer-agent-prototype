@@ -25,7 +25,8 @@ All notable changes to this customer-agent product implementation repository are
 - Linux CI overlay smoke runs under xvfb after packaging. See `docs/plans/2026-09-19-p10-linux-e2e-smoke.md`.
 - Linux CI installs Playwright/Electron OS libraries before the xvfb overlay smoke. See `docs/plans/2026-09-19-p10-linux-e2e-deps.md`.
 - CI uploads the UNSIGNED Linux AppImage as a workflow artifact, not a GitHub Release. See `docs/plans/2026-09-19-p10-linux-ci-artifact.md`.
-- Merge-order note now points at `feat/p10-linux-ci-artifact` as the Linux packaging/CI stack tip. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
+- Merge-order note now points at `feat/p10-linux-xdg-userdata` as the Linux packaging/CI stack tip. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
+- Linux packaged profile path follows Electron userData, including `XDG_CONFIG_HOME`, and is resolved at write time. See `docs/plans/2026-09-19-p10-linux-xdg-userdata.md`.
 
 ## [0.3.3] - 2026-09-18
 

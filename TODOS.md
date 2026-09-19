@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 包内后端仍不做。CI 上传 UNSIGNED Linux artifact，不是 Release。
+**Status:** OPEN · 包内后端仍不做。Linux userData 跟随 `XDG_CONFIG_HOME`。不是包内 PG。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 

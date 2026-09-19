@@ -28,7 +28,7 @@ pnpm --filter @customer-agent/desktop dev
 
 - macOS：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`
 - Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`
-- Linux：`~/.config/客服话术浮窗 Demo/synthetic-stack.json`
+- Linux：`~/.config/客服话术浮窗 Demo/synthetic-stack.json`（若设置了 `XDG_CONFIG_HOME`，则为其下同名目录）
 
 `synthetic-local` 仍只接受 loopback。会话文件按 API origin 分开，不会把本机 token 发到远端。
 
