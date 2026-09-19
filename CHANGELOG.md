@@ -2,11 +2,16 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.5] - 2026-09-19
+
+### Fixed
+
+- Feishu login completes after Feishu’s user_info hop instead of failing as OVERLOADED. Token POST still refuses redirects so a 307 cannot forward the client secret. Empty or non-HTTPS final URLs fail closed. A display-name write failure cannot fail login.
+
 ## [0.3.4] - 2026-09-18
 
 ### Changed
 
-- Feishu user_info follows redirects only onto open.feishu.cn / accounts.feishu.cn. `redirect: error` timed out on Feishu’s GET hop and failed every login as DEPENDENCY_UNAVAILABLE. Display-name writes cannot fail login.
 - Query treats only an expired announce lease as “当前版本已失效”. Login-time source_gate / unavailable no longer looks like a stale release.
 - After login, a previous announce lease no longer flashes “当前版本已失效”. The session chip shows the operator name (Feishu `name`, otherwise the user id), not the role.
 - Feishu token exchange accepts receipts up to 32KB. A 4KB cap treated a real user_access_token JSON as `DEPENDENCY_UNAVAILABLE`.
