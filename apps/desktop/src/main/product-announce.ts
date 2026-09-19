@@ -167,7 +167,7 @@ export class ProductAnnounce implements AnnounceGate {
     if (cursor !== null && this.snapshot.cursor !== cursor) throw new ProductHttpError('VALIDATION');
     const query = new URLSearchParams({ release_id: this.lease.releaseId, limit: '200', ...(cursor ? { cursor } : {}) });
     const result = await this.session.request(epoch, `/v1/announce/snapshot?${query}`, {
-      method: 'GET', headers: { 'x-client-id': this.clientId, 'x-snapshot-lease': this.lease.token },
+      method: 'GET', headers: { 'x-client-id': this.boundClientId(), 'x-snapshot-lease': this.lease.token },
     });
     const snapshot = parseContractSchema('SnapshotResponse', result.value);
     if (snapshot.release_id !== this.lease.releaseId || snapshot.release_seq !== this.lease.releaseSeq) throw new ProductHttpError('VALIDATION');

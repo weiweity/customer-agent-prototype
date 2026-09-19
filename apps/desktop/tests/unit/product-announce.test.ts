@@ -109,6 +109,7 @@ describe('product announce lease and snapshot', () => {
       if (url.pathname === '/v1/announce/snapshot') {
         expect(url.searchParams.get('release_id')).toBe(releaseId);
         expect(init?.headers && new Headers(init.headers).get('x-snapshot-lease')).toBe(leaseToken);
+        expect(init?.headers && new Headers(init.headers).get('x-client-id')).toBe(boundClientId);
         return Response.json(snapshotBody());
       }
       return new Response(null, { status: 404 });
