@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 包内后端仍不做。本刀：`synthetic-stack.json` 写入路径与 Electron userData 对齐（Windows `%APPDATA%`、Linux `~/.config`、macOS Application Support）。见 `docs/plans/2026-09-19-p10-desktop-userdata-path.md`。PG15 发现仍无 Windows 分支、Homebrew 非自包含。
+**Status:** OPEN · 包内后端仍不做。userData 路径已按平台对齐；how-to 补 Windows `%APPDATA%`。见 `docs/plans/2026-09-19-p10-userdata-docs.md`。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 

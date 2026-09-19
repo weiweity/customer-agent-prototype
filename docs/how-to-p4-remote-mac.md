@@ -24,4 +24,9 @@ pnpm --filter @customer-agent/desktop dev
 }
 ```
 
+放到 Electron userData（与打包客户端读取路径相同）：
+
+- macOS：`~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`
+- Windows：`%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`
+
 `synthetic-local` 仍只接受 loopback。会话文件按 API origin 分开，不会把本机 token 发到远端。

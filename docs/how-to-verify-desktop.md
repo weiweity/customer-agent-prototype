@@ -168,7 +168,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 `pnpm package:mac:local` 只证明构建图。要用 UNSIGNED `.app` 跑合成查询链：
 
-1. `node scripts/synthetic-stack/stack.ts start`（写入 `~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json`，只含 `mode` 与两个精确 loopback origin，无 token）
+1. `node scripts/synthetic-stack/stack.ts start`（写入 Electron userData 下的 `synthetic-stack.json`：macOS `~/Library/Application Support/客服话术浮窗 Demo/`，Windows `%APPDATA%\客服话术浮窗 Demo\`。只含 `mode` 与两个精确 loopback origin，无 token）
 2. 需要单独刷新或打印路径：`node scripts/synthetic-stack/stack.ts packaged-profile`（stdout 只有路径，不含开发态环境变量）
 3. 打开 `release/local-unsigned/mac-universal/客服话术浮窗 Demo.app`，或安装同一目录下的 UNSIGNED DMG/ZIP
 
