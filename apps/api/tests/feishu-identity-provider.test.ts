@@ -6,6 +6,9 @@ import {
   FEISHU_USER_INFO_URL,
 } from '../src/feishu-identity-provider.js';
 
+const persistOperatorDisplayName = vi.hoisted(() => vi.fn());
+vi.mock('../src/operator-display-names.js', () => ({ persistOperatorDisplayName }));
+
 const config = Object.freeze({
   clientId: 'cli_aaaaaaaaaaaaaaaa',
   clientSecret: 'test-feishu-secret-material-0001',
@@ -13,11 +16,16 @@ const config = Object.freeze({
 });
 const openId = 'ou_8f5c2a0000000001';
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+function jsonResponse(body: unknown, status = 200, url = '') {
+  const response = new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  if (url) Object.defineProperty(response, 'url', { value: url });
+  return response;
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  persistOperatorDisplayName.mockReset();
+  vi.unstubAllGlobals();
+});
 
 describe('feishu identity provider', () => {
   it('builds the official authorize URL without leaking the client secret', () => {
@@ -37,7 +45,7 @@ describe('feishu identity provider', () => {
     const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url === FEISHU_TOKEN_URL) {
-        expect(init?.redirect).toBe('error');
+        expect(init?.redirect).toBe('follow');
         const body = JSON.parse(String(init?.body)) as Record<string, string>;
         expect(body).toEqual({
           grant_type: 'authorization_code',
@@ -49,13 +57,15 @@ describe('feishu identity provider', () => {
         return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' });
       }
       if (url === FEISHU_USER_INFO_URL) {
+        expect(init?.redirect).toBe('follow');
         expect(init?.headers).toMatchObject({ authorization: 'Bearer user-access-token' });
-        return jsonResponse({ code: 0, data: { open_id: openId } });
+        return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, 200, 'https://open.feishu.cn/open-apis/authen/v1/user_info');
       }
       throw new Error(`unexpected ${url}`);
     }) as unknown as typeof fetch;
     const provider = createFeishuIdentityProvider(config, fetchImpl);
     expect(await provider.exchange('one-time-code')).toBe(openId);
+    expect(persistOperatorDisplayName).toHaveBeenCalledWith(`usr_${openId}`, '合成姓名');
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     provider.close();
     await expect(provider.exchange('one-time-code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
@@ -116,12 +126,35 @@ describe('feishu identity provider', () => {
     }
   });
 
-  it('does not follow redirects from Feishu endpoints', async () => {
-    const fetchImpl = vi.fn(async () => new Response('', { status: 302, headers: { location: 'https://example.com' } })) as unknown as typeof fetch;
+  it('rejects a Feishu response that settles on a non-Feishu host', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(
+      { code: 0, token_type: 'Bearer', access_token: 'user-access-token' },
+      200,
+      'https://example.com/stolen',
+    )) as unknown as typeof fetch;
     const provider = createFeishuIdentityProvider(config, fetchImpl);
     try {
       await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
-      expect(fetchImpl).toHaveBeenCalledWith(FEISHU_TOKEN_URL, expect.objectContaining({ redirect: 'error' }));
+      expect(fetchImpl).toHaveBeenCalledWith(FEISHU_TOKEN_URL, expect.objectContaining({ redirect: 'follow' }));
     } finally { provider.close(); }
+  });
+
+  it('still logs in when writing the display name fails', async () => {
+    persistOperatorDisplayName.mockImplementation(() => {
+      throw new Error('disk');
+    });
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      if (String(input) === FEISHU_TOKEN_URL) {
+        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, 200, FEISHU_TOKEN_URL);
+      }
+      return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, 200, FEISHU_USER_INFO_URL);
+    }) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      expect(await provider.exchange('one-time-code')).toBe(openId);
+    } finally {
+      persistOperatorDisplayName.mockReset();
+      provider.close();
+    }
   });
 });

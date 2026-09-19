@@ -8,6 +8,7 @@ export const FEISHU_USER_INFO_URL = 'https://open.feishu.cn/open-apis/authen/v1/
 const OPEN_ID_PATTERN = /^ou_[A-Za-z0-9]{6,64}$/;
 /** Feishu user_access_token JSON is often 1–2KB and can grow with scope; 4KB truncates a real receipt. */
 const MAX_BODY_BYTES = 32_768;
+const FEISHU_RESPONSE_HOSTS = new Set(['open.feishu.cn', 'accounts.feishu.cn']);
 
 export type FeishuIdentityProviderConfig = Readonly<{
   clientId: string;
@@ -53,6 +54,20 @@ export function createFeishuIdentityProvider(
     return new IdentityFailure('DEPENDENCY_UNAVAILABLE');
   }
 
+  function assertFeishuResponseHost(response: Response): void {
+    const raw = response.url;
+    if (!raw) return;
+    let hostname: string;
+    try {
+      hostname = new URL(raw).hostname;
+    } catch {
+      throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
+    }
+    if (!FEISHU_RESPONSE_HOSTS.has(hostname)) {
+      throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
+    }
+  }
+
   return Object.freeze({
     authorizeUrl(state: string) {
       const url = new URL(FEISHU_AUTHORIZE_URL);
@@ -71,7 +86,7 @@ export function createFeishuIdentityProvider(
       try {
         const tokenResponse = await fetchImpl(FEISHU_TOKEN_URL, {
           method: 'POST',
-          redirect: 'error',
+          redirect: 'follow',
           signal: controller.signal,
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -82,25 +97,38 @@ export function createFeishuIdentityProvider(
             redirect_uri: config.redirectUri,
           }),
         });
+        assertFeishuResponseHost(tokenResponse);
         if (!tokenResponse.ok) throw identityFromHttp(tokenResponse.status);
         const tokenBody = await readJson(tokenResponse);
         const accessToken = readAccessToken(tokenBody);
         if (!accessToken) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
         const userResponse = await fetchImpl(FEISHU_USER_INFO_URL, {
           method: 'GET',
-          redirect: 'error',
+          redirect: 'follow',
           signal: controller.signal,
           headers: { authorization: `Bearer ${accessToken}` },
         });
+        assertFeishuResponseHost(userResponse);
         if (!userResponse.ok) throw identityFromHttp(userResponse.status);
         const userBody = await readJson(userResponse);
         const openId = readOpenId(userBody);
         if (!openId) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
         const name = readDisplayName(userBody);
-        if (name) persistOperatorDisplayName(`usr_${openId}`.slice(0, 128), name);
+        if (name) {
+          try {
+            persistOperatorDisplayName(`usr_${openId}`.slice(0, 128), name);
+          } catch {
+            // Display name is best-effort; a write failure must not fail login.
+          }
+        }
         return openId;
       } catch (error) {
         if (error instanceof IdentityFailure) throw error;
+        const name = error instanceof Error ? error.name : 'unknown';
+        const code = error !== null && typeof error === 'object' && 'code' in error
+          ? String((error as { code: unknown }).code)
+          : '';
+        console.info(`[api] feishu identity transport failed: ${name}${code ? ` ${code}` : ''}`);
         throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
       } finally {
         clearTimeout(timeout);
