@@ -220,6 +220,7 @@ describe('packaged retrieval defaults', () => {
     expect(pipeline).toContain("productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX'");
     const search = readFileSync(path.join(desktopRoot, 'src/main/product-search.ts'), 'utf8');
     expect(search).toContain("productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json')");
+    expect(search).toContain("productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json')");
     expect(search).not.toMatch(/function loadIndexScripts\(\)[\s\S]{0,80}CUSTOMER_AGENT_RETRIEVAL_INDEX \?\? ''/);
   });
 });

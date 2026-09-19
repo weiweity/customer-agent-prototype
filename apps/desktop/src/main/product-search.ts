@@ -239,7 +239,7 @@ export class ProductSearch {
         }
         if (this.hydrate) throw new ProductHttpError('STALE');
       }
-      if ((process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim().length > 0) {
+      if (productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json').length > 0) {
         throw new ProductHttpError('UNAVAILABLE');
       }
       const jobs = searchJobs(route);
