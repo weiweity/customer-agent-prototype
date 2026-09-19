@@ -15,6 +15,7 @@ All notable changes to this customer-agent product implementation repository are
 - Product mode copies a leftover unkeyed catalog into the origin-keyed path once, then writes only the keyed file. See `docs/plans/2026-09-19-p7-seed-keyed-catalog.md`.
 - Retrieval CLIs write origin-keyed files when `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` is set. See `docs/plans/2026-09-19-p7-cli-origin-keyed.md`.
 - Dashboard wording and dense catalog reads follow origin-keyed files when env is unset. See `docs/plans/2026-09-19-p7-dashboard-origin-keyed.md`.
+- Retrieval telemetry is origin-keyed (`retrieval-telemetry.<id>.json`) so two API targets do not share impression logs. See `docs/plans/2026-09-19-p7-origin-keyed-telemetry.md`.
 
 ## [0.3.3] - 2026-09-18
 

@@ -92,6 +92,7 @@ export function applyPackagedRetrievalDefaults(
     index?: string;
     embeddings?: string;
     preference?: string;
+    telemetry?: string;
     apiOrigin?: string;
     home?: string;
   } = {},
@@ -100,10 +101,12 @@ export function applyPackagedRetrievalDefaults(
   const index = paths.index ?? stackPath('retrieval-index.json', paths);
   const embeddings = paths.embeddings ?? stackPath('retrieval-embeddings.json', paths);
   const preference = paths.preference ?? stackPath('retrieval-preference.json', paths);
+  const telemetry = paths.telemetry ?? stackPath('retrieval-telemetry.json', paths);
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_HYDRATE_INDEX', hydrate, Boolean(paths.apiOrigin));
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_RETRIEVAL_INDEX', index, Boolean(paths.apiOrigin));
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_EMBEDDING_INDEX', embeddings, Boolean(paths.apiOrigin));
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_RETRIEVAL_PREFERENCE', preference, Boolean(paths.apiOrigin));
+  assignRetrievalEnv(env, 'CUSTOMER_AGENT_RETRIEVAL_TELEMETRY', telemetry, Boolean(paths.apiOrigin));
 }
 
 function stackPath(
@@ -121,7 +124,8 @@ function assignRetrievalEnv(
     | 'CUSTOMER_AGENT_HYDRATE_INDEX'
     | 'CUSTOMER_AGENT_RETRIEVAL_INDEX'
     | 'CUSTOMER_AGENT_EMBEDDING_INDEX'
-    | 'CUSTOMER_AGENT_RETRIEVAL_PREFERENCE',
+    | 'CUSTOMER_AGENT_RETRIEVAL_PREFERENCE'
+    | 'CUSTOMER_AGENT_RETRIEVAL_TELEMETRY',
   path: string,
   isolate: boolean,
 ): void {

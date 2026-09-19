@@ -40,7 +40,7 @@
 | `pnpm retrieval:embeddings` | `scripts/embed-retrieval-index.ts` | 把正文编成仓外向量（MiniMax `type=db`）。查询时 `type=query`。hash 对不上或查询失败则退回 BM25 正文 |
 | `CUSTOMER_AGENT_HYDRATE_INDEX` | main `loadHydrateCatalog` | 仓外 JSON；`releaseId` 必须等于当前 `content_current`；行必须是 SearchCandidate 联合类型。登录分页公告 snapshot 后自动对齐；空 snapshot 和更小的种子 snapshot 不覆盖。开发态文件存在则自动挂路径 |
 | `pnpm retrieval:hydrate` | `scripts/sync-retrieval-hydrate.ts` | 手工把 snapshot JSON 写入仓外 hydrate。`--dry-run` 不写。拒绝写进 git 工作树 |
-| `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` | main `loadRetrievalTelemetryStore` | 仓外 JSON。缺省写在 hydrate 同目录 `retrieval-telemetry.json`。只记 queryId / 命中 / 曝光 scriptId / 是否复制，**不记问句原文** |
+| `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` | main `loadRetrievalTelemetryStore` | 仓外 JSON。产品模式按 API origin 写成 `retrieval-telemetry.<id>.json`。只记 queryId / 命中 / 曝光 scriptId / 是否复制，**不记问句原文** |
 | `pnpm retrieval:never-hit` | `scripts/report-retrieval-never-hit.ts` | 对照 hydrate 目录，列出从未曝光、曝光未复制，以及 no_hit 率。不打 leftover `/v1/search` |
 | `CUSTOMER_AGENT_RETRIEVAL_PREFERENCE` | 偏好文件路径 | 默认 `~/.customer-agent-synthetic-stack/retrieval-preference.json` |
 | `MINIMAX_API_KEY` | main `minimax-chat.ts` | 未设置则智能检索等同 OFF |

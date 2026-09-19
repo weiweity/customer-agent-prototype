@@ -111,7 +111,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 本机路径已冻结。P7 续刀：产品模式、CLI、管理台话术库与 dense 读取都按 origin 分文件。多公司 PG 分库未做。
+**Status:** 本机路径已冻结。P7 续刀：产品模式、CLI、管理台、telemetry 都按 origin 分文件。多公司 PG 分库未做。
 
 ### P8 · Windows DRAFT 与启动代码冲突
 
