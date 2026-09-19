@@ -41,8 +41,18 @@ const verifyWindowsPackage = readFileSync(
 );
 const readme = readFileSync(path.join(repositoryRoot, 'README.md'), 'utf8');
 const developmentBrief = readFileSync(path.join(repositoryRoot, 'DEVELOPMENT_BRIEF.md'), 'utf8');
+const stackProfile = readFileSync(
+  path.join(repositoryRoot, 'scripts/synthetic-stack/profile.ts'),
+  'utf8',
+);
 
 describe('Windows local-unsigned packaging contract', () => {
+  it('writes the packaged profile into Windows %APPDATA% userData, not macOS Application Support', () => {
+    expect(stackProfile).toContain("process.platform === 'win32'");
+    expect(stackProfile).toContain("'AppData', 'Roaming'");
+    expect(stackProfile).toContain('DESKTOP_APP_NAME');
+  });
+
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {
     expect(packageJson.scripts['package:win']).toBe('node scripts/package-windows.mjs local');
     expect(packageJson.scripts['package:win:distribution']).toBeUndefined();
