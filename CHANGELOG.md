@@ -20,6 +20,7 @@ All notable changes to this customer-agent product implementation repository are
 - Merge-order note now points at `feat/linux-packaged-remote-howto` as the P10/how-to stack tip. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
 - `pnpm package:linux` is local-unsigned, Linux-host only, and writes `release/local-unsigned/linux/`. See `docs/plans/2026-09-19-p10-package-linux-local.md`.
 - Linux packaging cleans temporary CA state when a step fails. See `docs/plans/2026-09-19-p10-package-linux-ca-cleanup.md`.
+- `how-to-verify-desktop` documents `pnpm package:linux` as Linux-host local-unsigned only. See `docs/plans/2026-09-19-p10-package-linux-verify-howto.md`.
 
 ## [0.3.3] - 2026-09-18
 

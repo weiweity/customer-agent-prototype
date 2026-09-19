@@ -59,6 +59,13 @@ describe('Linux local-unsigned packaging contract', () => {
     expect(packageLinuxSource).not.toContain('release/distribution');
     expect(howTo).toContain('package:linux');
     expect(howTo).toContain('必须在 **Linux** 上');
+    const verifyDesktop = readFileSync(
+      path.join(repositoryRoot, 'docs/how-to-verify-desktop.md'),
+      'utf8',
+    );
+    expect(verifyDesktop).toContain('### 3.4 `pnpm package:linux`');
+    expect(verifyDesktop).toContain('须在 **Linux** 上跑');
+    expect(verifyDesktop).toContain('### 3.5 W6 正式服务候选产物');
   });
 
   it('cleans only release/local-unsigned/linux and keeps sibling artifacts', () => {

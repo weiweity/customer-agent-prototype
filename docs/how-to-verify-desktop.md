@@ -43,6 +43,7 @@ pnpm -v    # 项目锁定 11.19.0
 | 从未命中统计 | `pnpm retrieval:never-hit` | 否 | 否 | 对照仓外 hydrate 与 `retrieval-telemetry.json`。不记问句原文，不打 leftover `/v1/search` |
 | 正式 macOS 外发门禁 | `pnpm package:mac` | 否 | 同上 | 同上，但当前会因 Demo `appId` fail-closed |
 | 本机未签名 Windows 证明包 | `pnpm package:win` | 否 | 会先生成 ICO | 会先 electron-vite build |
+| 本机未签名 Linux 证明包 | `pnpm package:linux` | 否 | 会先生成 PNG | 须在 **Linux** 上跑；macOS 交叉会失败 |
 
 ---
 
@@ -213,7 +214,17 @@ node apps/desktop/scripts/verify-mac-release-env.mjs && node apps/desktop/script
 
 W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上执行 `pnpm test:e2e:windows-feasibility` 与 `pnpm package:win`。定向 E2E 会实际启动 `apps/desktop/out/main/index.js`，不经过 `apps/desktop/node_modules/@customer-agent/*` 的嵌套解析；`package:win` 先构建 `packages/contracts` runtime `dist`，再让 electron-vite 把该包内联进 main，并在打包前检查产物不含 workspace 裸导入。该路径确认 Fox / Query 两个 overlay 使用透明背景、快捷键注册成功、查询窗可打开并能干净退出；它比“脚本存在”多证明一次 clean-checkout 的 Windows 运行路径与未签名产物后验，但仍不是企业坐席真机、IME/DPI/读屏、真实 OS 按键投递、GPU 合成观感、签名、更新、Pilot 或 D1–D5 产品会话验收。安装包与实机方案见 [DRAFT](plans/2026-09-10-windows-package-and-device-verification.md)，未批准开工，本页命令不得当作已授权打包。
 
-### 3.4 W6 正式服务候选产物
+### 3.4 `pnpm package:linux`
+
+输出目录：`release/local-unsigned/linux/`
+
+预期产物：文件名含 `UNSIGNED` 的 AppImage。`mode !== 'local'` 会直接抛错。非 Linux 主机会直接抛错。本机（macOS）**不得**把「脚本存在」写成「Linux 包已打出」。
+
+`apps/desktop/scripts/verify-linux-package.mjs` 能证明：输出目录里有 `UNSIGNED` 产物、无 `.blockmap` / `latest*` 更新元数据。它**不能**证明：在 Linux 上启动、桌面图标、远端登录。勾选见 [Linux 打包态远端](how-to-linux-packaged-product-remote.md)，全部未观察。
+
+禁止把未签名产物写成已签名或可外发。不含 PostgreSQL。
+
+### 3.5 W6 正式服务候选产物
 
 ```bash
 pnpm artifact:m0:build
