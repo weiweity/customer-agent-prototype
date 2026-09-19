@@ -70,6 +70,17 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(mergeOrder).toContain('feat/p7-embeddings-delivery');
     expect(mergeOrder).toContain('不要合');
     expect(mergeOrder).toContain('feat/p10-m5-userdata-note');
+    const remoteOffice = readFileSync(
+      path.join(repositoryRoot, 'docs/how-to-office-machine-product-remote.md'),
+      'utf8',
+    );
+    expect(remoteOffice).toContain('**未观察**');
+    expect(remoteOffice).toContain('飞书');
+    expect(remoteOffice).toContain('账号');
+    expect(remoteOffice).not.toMatch(/内部|外包/);
+    expect(remoteOffice).toContain('%APPDATA%\\客服话术浮窗 Demo\\synthetic-stack.json');
+    expect(remoteOffice).toContain('不要在办公机安装 PostgreSQL');
+    expect(remoteOffice).toContain('还不能用当前 main 上的安装包当本页证据');
   });
 
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {

@@ -40,6 +40,7 @@
 - SOP / 内容草稿 / 话术不准 / P0
 - Authenticode、Gatekeeper、企业分发
 - M5 设备清单
+- [办公机产品主链（远端）](how-to-office-machine-product-remote.md)（须新包，本页不得代填）
 
 ## 签署（办公机填写）
 
