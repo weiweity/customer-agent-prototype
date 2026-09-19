@@ -1,6 +1,6 @@
 # 本地未 push 分支合入顺序
 
-> **状态：** 盘点（`feat/local-merge-order`）。相对 `origin/main` `0ab267b`。  
+> **状态：** 已刷新（`feat/merge-order-refresh`）。相对 `origin/main` `0ab267b`。
 > **不包含：** 授权 push / 开 PR / 合 main / 配隧道。
 
 本机有多条互不跟踪的 feature 线。**不要把两条 P7 都合进去。**
@@ -24,14 +24,14 @@ origin 隔离线已包含登录写 BM25（`b92602c`）和登录补向量（`4e96
 4. `feat/windows-yield-focus` `bad4d09` — Windows 收起交还前台（非实机勾选）
 5. `feat/p10-no-bundled-stack` `31f6c50` — 缺配置不再叫人装 PG
 6. **P7 隔离线尖端** `feat/p7-publish-desktop-origin` `b04cc79`
-7. **P10 userData 线尖端** `feat/p10-m5-userdata-note` `9d74722`（含 `d95a5ec` 路径对齐 + Windows/Linux how-to + M5 注）
+7. **P10 userData + 三端远端 how-to 尖端** `feat/linux-packaged-remote-howto` `59396a2`（含 `d95a5ec` 路径对齐、Windows/Linux how-to、M5 注、合入顺序、办公机/macOS/Linux 远端清单）
 
-`feat/p10-no-bundled-stack` 与 P10 userData 线都从 main 分出，合入时可能撞 TODOS/CHANGELOG，按上面 5 再 7 处理。
+`feat/p10-no-bundled-stack` 与本 userData 线都从 main 分出，合入时可能撞 TODOS/CHANGELOG，按上面 5 再 7 处理。
 
 ## 中间 tip 不必单独开 PR
 
 P7 隔离线中间的 `feat/p7-origin-keyed-retrieval` … `feat/p7-origin-no-leftover-search` 已被 `b04cc79` 包含。  
-P10 userData 中间的 `feat/p10-desktop-userdata-path` … `feat/p10-linux-userdata-docs` 已被 `9d74722` 包含。
+P10 userData 中间的 `feat/p10-desktop-userdata-path`、`feat/p10-m5-userdata-note` … `feat/macos-packaged-remote-howto` 已被 `59396a2` 包含。
 
 ## 仍未做
 
@@ -40,3 +40,4 @@ P10 userData 中间的 `feat/p10-desktop-userdata-path` … `feat/p10-linux-user
 - 多公司 PG 分库
 - NSPanel native
 - 包内 PostgreSQL
+- 对等的 `package:linux` UNSIGNED 脚本

@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 包内后端仍不做。办公机远端主链 how-to 已写、全部未观察，须合入后再打新包。见 `docs/how-to-office-machine-product-remote.md`。
+**Status:** OPEN · 包内后端仍不做。P10/how-to 线尖端 `feat/linux-packaged-remote-howto`。合入顺序见 `docs/plans/2026-09-19-local-unpushed-merge-order.md`。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 
