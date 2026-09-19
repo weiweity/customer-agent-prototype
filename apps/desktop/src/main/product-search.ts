@@ -46,7 +46,7 @@ function candidateLive(candidate: ProductCandidate): boolean {
 }
 
 function loadIndexScripts(): RetrievalScript[] {
-  const indexPath = (process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX ?? '').trim();
+  const indexPath = productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json');
   if (indexPath.length === 0 || !existsSync(indexPath)) return [];
   try {
     const document = parseRetrievalIndex(readFileSync(indexPath, 'utf8'));

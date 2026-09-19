@@ -218,5 +218,8 @@ describe('packaged retrieval defaults', () => {
     const pipeline = readFileSync(path.join(desktopRoot, 'src/main/retrieval-pipeline.ts'), 'utf8');
     expect(hydrate).toContain("productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX'");
     expect(pipeline).toContain("productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX'");
+    const search = readFileSync(path.join(desktopRoot, 'src/main/product-search.ts'), 'utf8');
+    expect(search).toContain("productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json')");
+    expect(search).not.toMatch(/function loadIndexScripts\(\)[\s\S]{0,80}CUSTOMER_AGENT_RETRIEVAL_INDEX \?\? ''/);
   });
 });
