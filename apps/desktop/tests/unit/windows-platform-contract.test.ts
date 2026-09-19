@@ -69,6 +69,9 @@ describe('Windows local-unsigned packaging contract', () => {
       'utf8',
     );
     expect(mergeOrder).toContain('feat/p7-publish-desktop-origin');
+    expect(mergeOrder).toContain('b04cc79');
+    expect(mergeOrder).toContain('feat/p7-semantic-origin-path');
+    expect(mergeOrder).toContain('3878e4b');
     expect(mergeOrder).toContain('feat/p7-embeddings-delivery');
     expect(mergeOrder).toContain('不要合');
     expect(mergeOrder).toContain('feat/p10-m5-userdata-note');
@@ -79,6 +82,8 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(mergeOrder).toContain('feat/p10-linux-ci-artifact');
     expect(mergeOrder).toContain('9a1b519');
     expect(mergeOrder).toContain('feat/p10-linux-xdg-userdata');
+    expect(mergeOrder).toContain('4f12bfc');
+    expect(mergeOrder).toContain('feat/merge-order-p7-linux-tips');
     const remoteOffice = readFileSync(
       path.join(repositoryRoot, 'docs/how-to-office-machine-product-remote.md'),
       'utf8',
