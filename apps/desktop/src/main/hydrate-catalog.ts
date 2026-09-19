@@ -358,6 +358,9 @@ export function persistHydrateFromEnv(
       releaseId,
       items,
     });
+    if (hydrate.reason === 'kept-larger' || hydrate.reason === 'empty' || hydrate.reason === 'invalid') {
+      return hydrate;
+    }
     const retrievalPath = (process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX ?? '').trim();
     let indexWrote = false;
     if (retrievalPath.length > 0) {
@@ -374,7 +377,7 @@ export function persistHydrateFromEnv(
         // use hydrate.retrievalScripts() when the index file is missing.
       }
     }
-    if (indexWrote && !hydrate.wrote) {
+    if (indexWrote && hydrate.reason === 'aligned') {
       return Object.freeze({ ...hydrate, wrote: true, skipped: false, reason: 'wrote' as const });
     }
     return hydrate;
