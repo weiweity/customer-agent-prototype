@@ -242,7 +242,7 @@ describe('feishu identity provider', () => {
     const payload = new TextEncoder().encode(JSON.stringify({
       code: 0, token_type: 'Bearer', access_token: 'user-access-token',
     }));
-    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const fetchImpl = vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
       if (String(input) === FEISHU_TOKEN_URL) {
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
