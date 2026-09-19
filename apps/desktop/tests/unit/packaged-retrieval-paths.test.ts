@@ -10,6 +10,7 @@ import {
   defaultSyntheticStackFile,
   envOrOriginStackFile,
   originKeyedStackFile,
+  productStackReadPath,
   resolveRetrievalStackFile,
   resolveStackFile,
 } from '../../src/main/packaged-retrieval-paths';
@@ -197,5 +198,24 @@ describe('packaged retrieval defaults', () => {
     const dense = readFileSync(path.join(desktopRoot, 'src/main/retrieval-embeddings-store.ts'), 'utf8');
     expect(wording).toContain("envOrOriginStackFile('CUSTOMER_AGENT_HYDRATE_INDEX'");
     expect(dense).toContain("envOrOriginStackFile('CUSTOMER_AGENT_EMBEDDING_INDEX'");
+  });
+
+  it('does not load the operator home catalog when origin is unset', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-runtime-'));
+    directories.push(home);
+    mkdirSync(path.join(home, '.customer-agent-synthetic-stack'));
+    writeFileSync(defaultSyntheticStackFile('retrieval-hydrate.json', home), '{}\n');
+    expect(productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json', {}, home)).toBe('');
+    const origin = 'https://agent-auth.jianghua.site';
+    expect(productStackReadPath(
+      'CUSTOMER_AGENT_HYDRATE_INDEX',
+      'retrieval-hydrate.json',
+      { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: origin },
+      home,
+    )).toBe(originKeyedStackFile('retrieval-hydrate.json', origin, home));
+    const hydrate = readFileSync(path.join(desktopRoot, 'src/main/hydrate-catalog.ts'), 'utf8');
+    const pipeline = readFileSync(path.join(desktopRoot, 'src/main/retrieval-pipeline.ts'), 'utf8');
+    expect(hydrate).toContain("productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX'");
+    expect(pipeline).toContain("productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX'");
   });
 });

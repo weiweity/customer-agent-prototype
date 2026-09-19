@@ -12,11 +12,11 @@ import { isProductEscalateRequest, isProductTerminalRequest } from '../shared/pr
 import { loadRetrievalPreferenceStore } from './retrieval-preference-store';
 import { loadRetrievalPipeline } from './retrieval-pipeline';
 import { writeSystemClipboard } from './system-clipboard.ts';
-import { DEFAULT_RETRIEVAL_PREFERENCE_PATH } from './packaged-retrieval-paths.ts';
+import { DEFAULT_RETRIEVAL_PREFERENCE_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 
 export function registerProductSearchIpc(session: ProductSession | null, announce: AnnounceGate | null, trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null, devUrl: () => string | undefined, help?: SearchHelp) {
   const preferenceStore = loadRetrievalPreferenceStore(
-    (process.env.CUSTOMER_AGENT_RETRIEVAL_PREFERENCE ?? '').trim()
+    productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_PREFERENCE', 'retrieval-preference.json')
       || DEFAULT_RETRIEVAL_PREFERENCE_PATH,
   );
   const search = session && announce

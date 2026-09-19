@@ -16,6 +16,7 @@ All notable changes to this customer-agent product implementation repository are
 - Retrieval CLIs write origin-keyed files when `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` is set. See `docs/plans/2026-09-19-p7-cli-origin-keyed.md`.
 - Dashboard wording and dense catalog reads follow origin-keyed files when env is unset. See `docs/plans/2026-09-19-p7-dashboard-origin-keyed.md`.
 - Retrieval telemetry is origin-keyed (`retrieval-telemetry.<id>.json`) so two API targets do not share impression logs. See `docs/plans/2026-09-19-p7-origin-keyed-telemetry.md`.
+- Hydrate, BM25, and the smart-retrieval preference load origin-keyed files at query time when the desktop API origin is set. See `docs/plans/2026-09-19-p7-runtime-origin-reads.md`.
 
 ## [0.3.3] - 2026-09-18
 

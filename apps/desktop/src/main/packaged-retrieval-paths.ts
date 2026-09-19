@@ -80,6 +80,23 @@ export function envOrOriginStackFile(
 }
 
 /**
+ * Runtime readers: explicit env, else origin-keyed path. Empty when neither
+ * is set so unit tests do not load the operator's real home catalog.
+ */
+export function productStackReadPath(
+  envName: string,
+  name: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+): string {
+  const explicit = (env[envName] ?? '').trim();
+  if (explicit.length > 0) return explicit;
+  const origin = (env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN ?? '').trim();
+  if (origin.length === 0) return '';
+  return originKeyedStackFile(name, origin, home);
+}
+
+/**
  * Product-mode startup (packaged or `pnpm dev` with loopback origins) must not
  * depend on a developer shell exporting retrieval paths. Existing off-repo
  * files win. With an API origin, missing files still get origin-keyed default

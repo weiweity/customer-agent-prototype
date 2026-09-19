@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { ProductCandidate } from '../shared/product-search';
 import type { RankedRetrieval, RetrievalScript } from '../shared/hybrid-retrieve';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
-import { DEFAULT_HYDRATE_INDEX_PATH } from './packaged-retrieval-paths.ts';
+import { DEFAULT_HYDRATE_INDEX_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 
 export type HydrateCatalog = Readonly<{
   releaseId: string;
@@ -377,7 +377,9 @@ function asCandidate(row: SnapshotRow, rank: 1 | 2 | 3): ProductCandidate {
   };
 }
 
-export function loadHydrateCatalog(indexPath = process.env.CUSTOMER_AGENT_HYDRATE_INDEX): HydrateCatalog | null {
+export function loadHydrateCatalog(
+  indexPath = productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json') || undefined,
+): HydrateCatalog | null {
   if (!indexPath || indexPath.trim().length === 0 || !existsSync(indexPath)) return null;
   try {
     const raw: unknown = JSON.parse(readFileSync(indexPath, 'utf8'));
