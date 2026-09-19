@@ -28,6 +28,7 @@ All notable changes to this customer-agent product implementation repository are
 - Merge-order note now points at `feat/p10-linux-xdg-userdata` as the Linux packaging/CI stack tip. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
 - Linux packaged profile path follows Electron userData, including `XDG_CONFIG_HOME`, and is resolved at write time. See `docs/plans/2026-09-19-p10-linux-xdg-userdata.md`.
 - Merge-order note now points at `feat/p7-semantic-origin-path` `3878e4b` and `feat/merge-order-p7-linux-tips`. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
+- Linux AppImage uses ASCII `executableName` `customer-agent-desktop`. Electron-builder rejects the scoped package name.
 
 ## [0.3.3] - 2026-09-18
 

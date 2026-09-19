@@ -3,7 +3,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resetLinuxPackageOutput } from '../../scripts/package-linux.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repositoryRoot = path.resolve(root, '../..');
@@ -12,6 +11,7 @@ const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'ut
   build: {
     extraResources: Array<{ from: string; to: string }>;
     linux: {
+      executableName: string;
       icon: string;
       target: Array<{ target: string; arch: string[] }>;
       artifactName: string;
@@ -41,6 +41,8 @@ describe('Linux local-unsigned packaging contract', () => {
     expect(rootPackageJson.scripts['package:linux']).toBe(
       'pnpm --filter @customer-agent/desktop package:linux',
     );
+    expect(packageJson.build.linux.executableName).toMatch(/^[A-Za-z0-9._-]+$/);
+    expect(packageJson.build.linux.executableName).not.toContain('@');
     expect(packageJson.build.linux.icon).toBe('build/icon.png');
     expect(packageJson.build.linux.target).toEqual([{ target: 'AppImage', arch: ['x64'] }]);
     expect(packageJson.build.linux.artifactName).toContain('UNSIGNED');
@@ -122,7 +124,10 @@ describe('Linux local-unsigned packaging contract', () => {
     expect(() => verifyLinuxPackage({ repositoryRoot: fixtureRoot })).not.toThrow();
   });
 
-  it('cleans only release/local-unsigned/linux and keeps sibling artifacts', () => {
+  it('cleans only release/local-unsigned/linux and keeps sibling artifacts', async () => {
+    const { resetLinuxPackageOutput } = await import(
+      pathToFileURL(path.join(root, 'scripts/package-linux.mjs')).href
+    ) as { resetLinuxPackageOutput: (projectRoot: string) => string };
     const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'linux-package-root-'));
     directories.push(fixtureRoot);
     const linuxOutput = path.join(fixtureRoot, 'release', 'local-unsigned', 'linux');

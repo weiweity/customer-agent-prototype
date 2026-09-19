@@ -141,6 +141,7 @@
       "differentialPackage": false
     },
     "linux": {
+      "executableName": "customer-agent-desktop",
       "icon": "build/icon.png",
       "category": "Office",
       "target": [
