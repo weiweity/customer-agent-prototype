@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
-import { envOrOriginStackFile } from './packaged-retrieval-paths.ts';
+import { runtimeStackReadPath } from './packaged-retrieval-paths.ts';
 
 export const RETRIEVAL_TELEMETRY_VERSION = 1;
 export const RETRIEVAL_TELEMETRY_MAX_EVENTS = 2000;
@@ -236,7 +236,7 @@ export function defaultTelemetryPath(
   if (explicit.length > 0) return explicit;
   const origin = (env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN ?? '').trim();
   if (origin.length > 0) {
-    return envOrOriginStackFile('CUSTOMER_AGENT_RETRIEVAL_TELEMETRY', 'retrieval-telemetry.json', env, home);
+    return runtimeStackReadPath('CUSTOMER_AGENT_RETRIEVAL_TELEMETRY', 'retrieval-telemetry.json', env, home);
   }
   const hydrate = (env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
   if (hydrate.length === 0) return '';

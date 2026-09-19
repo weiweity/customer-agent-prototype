@@ -102,6 +102,21 @@ export function productStackReadPath(
 }
 
 /**
+ * Runtime read: origin-set never falls back to leftover unkeyed files.
+ * Origin unset still uses leftover unkeyed for local dashboard / CLI.
+ */
+export function runtimeStackReadPath(
+  envName: string,
+  name: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+): string {
+  const isolated = productStackReadPath(envName, name, env, home);
+  if (isolated.length > 0) return isolated;
+  return envOrOriginStackFile(envName, name, env, home);
+}
+
+/**
  * Product-mode startup (packaged or `pnpm dev` with loopback origins) must not
  * depend on a developer shell exporting retrieval paths. Existing off-repo
  * files win. With an API origin, missing files still get origin-keyed default

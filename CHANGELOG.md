@@ -23,6 +23,7 @@ All notable changes to this customer-agent product implementation repository are
 - Product-remote search does not fall back to leftover `/v1/search` when a desktop API origin is set. See `docs/plans/2026-09-19-p7-origin-no-leftover-search.md`.
 - Product mode publishes `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` from the runtime profile when unset. See `docs/plans/2026-09-19-p7-publish-desktop-origin.md`.
 - Seeding an origin-keyed catalog from a leftover unkeyed file is best-effort; a copy failure does not abort packaged startup. See `docs/plans/2026-09-19-p7-seed-copy-best-effort.md`.
+- Dashboard, dense catalog, and telemetry reads do not fall back to leftover unkeyed files when the desktop API origin is set. See `docs/plans/2026-09-19-p7-runtime-no-unkeyed.md`.
 
 ## [0.3.3] - 2026-09-18
 

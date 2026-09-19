@@ -19,8 +19,8 @@ import { EMBED_BATCH, minimaxEmbed, type EmbedKind } from './minimax-embed.ts';
 import { minimaxConfigured, type MinimaxChatOptions } from './minimax-chat.ts';
 import {
   DEFAULT_EMBEDDING_INDEX_PATH,
-  envOrOriginStackFile,
   productStackReadPath,
+  runtimeStackReadPath,
 } from './packaged-retrieval-paths.ts';
 
 export const DEFAULT_EMBED_PATH = DEFAULT_EMBEDDING_INDEX_PATH;
@@ -48,7 +48,7 @@ function writeAtomic(path: string, body: string): void {
 }
 
 export function loadDenseCatalog(
-  path = envOrOriginStackFile('CUSTOMER_AGENT_EMBEDDING_INDEX', 'retrieval-embeddings.json'),
+  path = runtimeStackReadPath('CUSTOMER_AGENT_EMBEDDING_INDEX', 'retrieval-embeddings.json'),
 ): DenseCatalog | null {
   if (!path || path.trim().length === 0 || !existsSync(path)) return null;
   try {

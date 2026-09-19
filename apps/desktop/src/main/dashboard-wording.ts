@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { envOrOriginStackFile } from './packaged-retrieval-paths';
+import { runtimeStackReadPath } from './packaged-retrieval-paths';
 import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
 import type { DashboardWordingDomain, DashboardWordingEntry, DashboardWordingView } from '../shared/dashboard-wording';
@@ -45,11 +45,11 @@ function readJson(path: string): unknown {
 }
 
 function hydratePath(): string | null {
-  return offRepoFile(envOrOriginStackFile('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json'));
+  return offRepoFile(runtimeStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json'));
 }
 
 function indexPath(): string | null {
-  return offRepoFile(envOrOriginStackFile('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json'));
+  return offRepoFile(runtimeStackReadPath('CUSTOMER_AGENT_RETRIEVAL_INDEX', 'retrieval-index.json'));
 }
 
 function platformLabel(scope: unknown): string {

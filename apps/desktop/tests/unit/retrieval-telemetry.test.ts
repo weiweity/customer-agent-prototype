@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -7,7 +7,7 @@ import {
   defaultTelemetryPath,
   summarizeNeverHit,
 } from '../../src/main/retrieval-telemetry-store';
-import { originKeyedStackFile } from '../../src/main/packaged-retrieval-paths';
+import { defaultSyntheticStackFile, originKeyedStackFile } from '../../src/main/packaged-retrieval-paths';
 
 const hash = 'a'.repeat(64);
 
@@ -66,6 +66,11 @@ describe('retrieval never-hit ledger', () => {
     const home = mkdtempSync(join(tmpdir(), 'telemetry-home-'));
     const origin = 'https://agent-auth.jianghua.site';
     const env: NodeJS.ProcessEnv = { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: origin };
+    expect(defaultTelemetryPath(env, home)).toBe(
+      originKeyedStackFile('retrieval-telemetry.json', origin, home),
+    );
+    mkdirSync(join(home, '.customer-agent-synthetic-stack'));
+    writeFileSync(defaultSyntheticStackFile('retrieval-telemetry.json', home), '{"version":1,"events":[]}\n');
     expect(defaultTelemetryPath(env, home)).toBe(
       originKeyedStackFile('retrieval-telemetry.json', origin, home),
     );

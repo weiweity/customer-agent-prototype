@@ -13,6 +13,7 @@ import {
   productStackReadPath,
   resolveRetrievalStackFile,
   resolveStackFile,
+  runtimeStackReadPath,
 } from '../../src/main/packaged-retrieval-paths';
 import { loadRetrievalPreferenceStore } from '../../src/main/retrieval-preference-store';
 
@@ -227,8 +228,22 @@ describe('packaged retrieval defaults', () => {
       .toBe('/tmp/explicit-hydrate.json');
     const wording = readFileSync(path.join(desktopRoot, 'src/main/dashboard-wording.ts'), 'utf8');
     const dense = readFileSync(path.join(desktopRoot, 'src/main/retrieval-embeddings-store.ts'), 'utf8');
-    expect(wording).toContain("envOrOriginStackFile('CUSTOMER_AGENT_HYDRATE_INDEX'");
-    expect(dense).toContain("envOrOriginStackFile('CUSTOMER_AGENT_EMBEDDING_INDEX'");
+    expect(wording).toContain("runtimeStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX'");
+    expect(dense).toContain("runtimeStackReadPath('CUSTOMER_AGENT_EMBEDDING_INDEX'");
+  });
+
+  it('does not read leftover unkeyed files when the desktop API origin is set', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-no-leftover-'));
+    directories.push(home);
+    mkdirSync(path.join(home, '.customer-agent-synthetic-stack'));
+    const origin = 'https://agent-auth.jianghua.site';
+    const unkeyed = defaultSyntheticStackFile('retrieval-hydrate.json', home);
+    writeFileSync(unkeyed, '{"releaseId":"leftover"}\n');
+    const env: NodeJS.ProcessEnv = { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: origin };
+    const keyed = originKeyedStackFile('retrieval-hydrate.json', origin, home);
+    expect(runtimeStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json', env, home)).toBe(keyed);
+    expect(envOrOriginStackFile('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json', env, home)).toBe(unkeyed);
+    expect(runtimeStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json', {}, home)).toBe(unkeyed);
   });
 
   it('does not load the operator home catalog when origin is unset', () => {
