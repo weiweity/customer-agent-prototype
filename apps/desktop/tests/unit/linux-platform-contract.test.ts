@@ -72,9 +72,54 @@ describe('Linux local-unsigned packaging contract', () => {
     expect(ci).toContain('linux-feasibility]');
     expect(ci).toContain('xvfb-run');
     expect(ci).toContain('playwright install-deps');
+    expect(ci).toContain('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02');
+    expect(ci).toContain('linux-local-unsigned');
+    expect(ci).toContain('*UNSIGNED*.AppImage');
+    expect(ci).toContain('if-no-files-found: error');
+    expect(ci).toContain('Smoke electron-vite out/ from packaging (not the AppImage)');
+    expect(ci).toContain('overlay smoke launches packaging build out/main, not the AppImage');
+    expect(ci).not.toMatch(/softprops\/action-gh-release|release:|github\.rest\.repos\.createRelease/);
     expect(ci).toContain('@linux-feasibility');
     const smoke = readFileSync(path.join(root, 'tests/e2e/smoke.spec.ts'), 'utf8');
     expect(smoke).toContain('@linux-feasibility');
+    expect(smoke).toContain('out/main/index.js');
+    expect(smoke).not.toMatch(/AppImage/);
+    expect(verifyDesktop).toContain('非空 UNSIGNED AppImage');
+    expect(verifyDesktop).toContain('不是** AppImage');
+  });
+
+  it('fail-closes unless a non-empty UNSIGNED AppImage is present', async () => {
+    const { verifyLinuxPackage } = await import(
+      pathToFileURL(path.join(root, 'scripts/verify-linux-package.mjs')).href
+    ) as { verifyLinuxPackage: (options?: { repositoryRoot?: string }) => void };
+    const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'linux-package-verify-'));
+    directories.push(fixtureRoot);
+    const outputDirectory = path.join(fixtureRoot, 'release', 'local-unsigned', 'linux');
+    mkdirSync(outputDirectory, { recursive: true });
+    const artifact = path.join(
+      outputDirectory,
+      'Customer-Agent-0.3.4-linux-x64-UNSIGNED.AppImage',
+    );
+
+    expect(() => verifyLinuxPackage({ repositoryRoot: fixtureRoot })).toThrow(/UNSIGNED AppImage/);
+
+    writeFileSync(path.join(outputDirectory, 'notes-UNSIGNED.txt'), 'not-an-image');
+    expect(() => verifyLinuxPackage({ repositoryRoot: fixtureRoot })).toThrow(/UNSIGNED AppImage/);
+    rmSync(path.join(outputDirectory, 'notes-UNSIGNED.txt'));
+
+    writeFileSync(artifact, '');
+    expect(() => verifyLinuxPackage({ repositoryRoot: fixtureRoot })).toThrow(/missing or empty/i);
+    writeFileSync(artifact, 'appimage');
+
+    writeFileSync(path.join(outputDirectory, 'latest-linux.yml'), 'update');
+    expect(() => verifyLinuxPackage({ repositoryRoot: fixtureRoot })).toThrow(/update metadata/i);
+    rmSync(path.join(outputDirectory, 'latest-linux.yml'));
+
+    writeFileSync(path.join(outputDirectory, 'foo.blockmap'), 'block');
+    expect(() => verifyLinuxPackage({ repositoryRoot: fixtureRoot })).toThrow(/update metadata/i);
+    rmSync(path.join(outputDirectory, 'foo.blockmap'));
+
+    expect(() => verifyLinuxPackage({ repositoryRoot: fixtureRoot })).not.toThrow();
   });
 
   it('cleans only release/local-unsigned/linux and keeps sibling artifacts', () => {

@@ -149,6 +149,9 @@ jobs:
     name: Linux feasibility smoke
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: write
     steps:
       - if: needs.changes.outputs.mode == 'docs'
         run: echo "Documentation scope verified by Verification scope; runtime checks are not applicable."
@@ -170,19 +173,27 @@ jobs:
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm package:linux
       - if: needs.changes.outputs.mode == 'full'
+        name: Upload UNSIGNED Linux package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-local-unsigned
+          path: release/local-unsigned/linux/*UNSIGNED*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+      - if: needs.changes.outputs.mode == 'full'
         name: Install Xvfb and Electron runtime libraries
         run: |
           sudo apt-get update
           sudo apt-get install --yes xvfb
           pnpm --filter @customer-agent/desktop exec playwright install-deps
       - if: needs.changes.outputs.mode == 'full'
-        name: Smoke the desktop output just built by packaging
+        name: Smoke electron-vite out/ from packaging (not the AppImage)
         run: xvfb-run --auto-servernum pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/smoke.spec.ts --grep @linux-feasibility
       - if: needs.changes.outputs.mode == 'full'
         name: State evidence boundary
         run: |
-          echo "PASS: hosted Ubuntu local-unsigned Linux package postconditions, overlay smoke, shortcut registration, clean exit."
-          echo "NOT PROVEN: IME, signing, update, Pilot, or product-remote login."
+          echo "PASS: hosted Ubuntu UNSIGNED AppImage postconditions; overlay smoke launches packaging build out/main, not the AppImage."
+          echo "NOT PROVEN: AppImage launch, IME, signing, update, Pilot, or product-remote login."
 
   gate:
     name: CI gate

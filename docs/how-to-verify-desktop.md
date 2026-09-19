@@ -220,11 +220,11 @@ W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上�
 
 预期产物：文件名含 `UNSIGNED` 的 AppImage。`mode !== 'local'` 会直接抛错。非 Linux 主机会直接抛错。本机（macOS）**不得**把「脚本存在」写成「Linux 包已打出」。
 
-`apps/desktop/scripts/verify-linux-package.mjs` 能证明：输出目录里有 `UNSIGNED` 产物、无 `.blockmap` / `latest*` 更新元数据。它**不能**证明：在 Linux 上启动、桌面图标、远端登录。勾选见 [Linux 打包态远端](how-to-linux-packaged-product-remote.md)，全部未观察。
+`apps/desktop/scripts/verify-linux-package.mjs` 能证明：输出目录里有非空 UNSIGNED AppImage、无 `.blockmap` / `latest*` 更新元数据。它**不能**证明：在 Linux 上启动、桌面图标、远端登录。勾选见 [Linux 打包态远端](how-to-linux-packaged-product-remote.md)，全部未观察。
 
 禁止把未签名产物写成已签名或可外发。不含 PostgreSQL。
 
-CI `Linux feasibility smoke` 在 ubuntu-latest 上跑 `pnpm package:linux`，安装 Playwright/Electron 系统库，再用 xvfb 跑 `@linux-feasibility` overlay smoke。它比「脚本存在」多证明一次 Linux hosted 构建图和透明浮窗启动，仍不是 IME、签名或 [远端勾选](how-to-linux-packaged-product-remote.md)。
+CI `Linux feasibility smoke` 在 ubuntu-latest 上跑 `pnpm package:linux`，把 `*UNSIGNED*` 上传为 workflow artifact（不是 Release），安装 Playwright/Electron 系统库，再用 xvfb 跑 `@linux-feasibility`。Overlay smoke 启动的是打包过程打出的 `out/`，**不是** AppImage。仍不是 IME、签名或 [远端勾选](how-to-linux-packaged-product-remote.md)。
 
 ### 3.5 W6 正式服务候选产物
 

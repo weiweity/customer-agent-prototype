@@ -1,6 +1,6 @@
 # 本地未 push 分支合入顺序
 
-> **状态：** 已刷新（`feat/merge-order-refresh`）。相对 `origin/main` `0ab267b`。
+> **状态：** 已刷新（`feat/p10-linux-ci-artifact`）。相对 `origin/main` `0ab267b`。
 > **不包含：** 授权 push / 开 PR / 合 main / 配隧道。
 
 本机有多条互不跟踪的 feature 线。**不要把两条 P7 都合进去。**
@@ -25,13 +25,15 @@ origin 隔离线已包含登录写 BM25（`b92602c`）和登录补向量（`4e96
 5. `feat/p10-no-bundled-stack` `31f6c50` — 缺配置不再叫人装 PG
 6. **P7 隔离线尖端** `feat/p7-publish-desktop-origin` `b04cc79`
 7. **P10 userData + 三端远端 how-to 尖端** `feat/linux-packaged-remote-howto` `59396a2`（含 `d95a5ec` 路径对齐、Windows/Linux how-to、M5 注、合入顺序、办公机/macOS/Linux 远端清单）
+8. **P10 Linux local-unsigned + CI 尖端** `feat/p10-linux-ci-artifact`（含 `cfc4bed` 系统库、UNSIGNED AppImage artifact 上传、后验只认非空 AppImage）。Overlay smoke 仍启动打包 `out/`，不是 AppImage。
 
-`feat/p10-no-bundled-stack` 与本 userData 线都从 main 分出，合入时可能撞 TODOS/CHANGELOG，按上面 5 再 7 处理。
+`feat/p10-no-bundled-stack` 与本 userData 线都从 main 分出，合入时可能撞 TODOS/CHANGELOG，按上面 5 再 7 再 8 处理。
 
 ## 中间 tip 不必单独开 PR
 
 P7 隔离线中间的 `feat/p7-origin-keyed-retrieval` … `feat/p7-origin-no-leftover-search` 已被 `b04cc79` 包含。  
-P10 userData 中间的 `feat/p10-desktop-userdata-path`、`feat/p10-m5-userdata-note` … `feat/macos-packaged-remote-howto` 已被 `59396a2` 包含。
+P10 userData 中间的 `feat/p10-desktop-userdata-path`、`feat/p10-m5-userdata-note` … `feat/macos-packaged-remote-howto` 已被 `59396a2` 包含。  
+P10 Linux 打包中间的 `feat/p10-package-linux-local` … `feat/p10-linux-e2e-deps` `cfc4bed` 已被 `feat/p10-linux-ci-artifact` 包含。
 
 ## 仍未做
 

@@ -23,9 +23,16 @@ export function verifyLinuxPackage(options = {}) {
   if (names.some((name) => /\.blockmap$/i.test(name) || /^latest/i.test(name))) {
     throw new Error('Linux local-unsigned output must not include update metadata');
   }
-  const unsigned = names.filter((name) => name.includes('UNSIGNED'));
-  if (unsigned.length < 1) {
-    throw new Error('Linux local-unsigned output must include an UNSIGNED artifact');
+  const artifacts = names.filter((name) => name.includes('UNSIGNED') && /\.AppImage$/i.test(name));
+  if (artifacts.length < 1) {
+    throw new Error('Linux local-unsigned output must include a non-empty UNSIGNED AppImage');
+  }
+  for (const name of artifacts) {
+    const full = path.join(outputDirectory, name);
+    const info = statSync(full);
+    if (!info.isFile() || info.size < 1) {
+      throw new Error(`UNSIGNED AppImage is missing or empty: ${full}`);
+    }
   }
 }
 
