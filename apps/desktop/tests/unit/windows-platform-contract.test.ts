@@ -54,7 +54,9 @@ describe('Windows local-unsigned packaging contract', () => {
     const verifyDesktop = readFileSync(path.join(repositoryRoot, 'docs/how-to-verify-desktop.md'), 'utf8');
     const p4 = readFileSync(path.join(repositoryRoot, 'docs/how-to-p4-remote-mac.md'), 'utf8');
     expect(verifyDesktop).toContain('%APPDATA%\\客服话术浮窗 Demo');
+    expect(verifyDesktop).toContain('~/.config/客服话术浮窗 Demo/');
     expect(p4).toContain('%APPDATA%\\客服话术浮窗 Demo\\synthetic-stack.json');
+    expect(p4).toContain('~/.config/客服话术浮窗 Demo/synthetic-stack.json');
   });
 
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {
