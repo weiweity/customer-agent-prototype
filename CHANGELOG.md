@@ -8,7 +8,8 @@ All notable changes to this customer-agent product implementation repository are
 
 - Feishu login opens in the system browser. The 520×420 window stays a 飞书 / 账号 chooser. With off-repo `feishu.env`, you can complete official Feishu OAuth as `owner` (or another allowlisted role); account login uses the hashed loopback password server. See `docs/how-to-feishu-and-password-mac.md`.
 - Cancelling the chooser after the browser opens stops the desktop login instead of still exchanging a session.
-- Packaged and unpackaged desktop can use a `product-remote` HTTPS origin (no IP, no public HTTP, no userinfo). The API still binds `127.0.0.1`. Session files are keyed by API origin. See `docs/how-to-p4-remote-mac.md`.
+- Desktop ProductHttp, account `/password`, and MiniMax share Electron `net.fetch` (system trust store). The login isolated session uses the same permission policy as the default session. Certificate pinning is not default. See `docs/plans/2026-09-19-p6-cert-proxy-paths.md`.
+- Account login POSTs `/password` to the HTTPS identity origin and callbacks the API origin. Identity timeout is 15s. The password server still binds loopback; a second named-tunnel hostname is documented. See `docs/plans/2026-09-19-p4-account-https-tunnel.md`.
 - Off-repo hydrate and BM25 files are keyed by API origin, same hash as the session file. A leftover unkeyed catalog is still used until the keyed file exists. See `docs/plans/2026-09-19-p7-origin-keyed-retrieval.md`.
 - Answer embeddings use the same origin-keyed path. See `docs/plans/2026-09-19-p7-origin-keyed-embeddings.md`.
 - The smart-retrieval preference file is origin-keyed and loaded after packaged retrieval defaults, not at import time. See `docs/plans/2026-09-19-p7-origin-keyed-preference.md`.
@@ -27,6 +28,8 @@ All notable changes to this customer-agent product implementation repository are
 - Login schedules background embeddings only after hydrate writes or already matches the snapshot, not when a smaller seed is kept out. See `docs/plans/2026-09-19-p7-embed-after-persist.md`.
 - Login persist does not write a smaller BM25 index or report `wrote` when hydrate keeps a larger local catalog. See `docs/plans/2026-09-19-p7-persist-no-shrink.md`.
 - Query BM25 fallback loads origin-keyed retrieval-index files instead of only `CUSTOMER_AGENT_RETRIEVAL_INDEX`. See `docs/plans/2026-09-19-p7-semantic-origin-path.md`.
+- M5 lists `product-remote` as a separate re-verify table, all **未观察**. `synthetic-offline` cannot tick login / search / copy. See `docs/how-to-verify-macos-m5.md` §7.1.
+- Packaged and unpackaged desktop can use a `product-remote` HTTPS origin (no IP, no public HTTP, no userinfo). The API still binds `127.0.0.1`. Session files are keyed by API origin. See `docs/how-to-p4-remote-mac.md`.
 
 ## [0.3.3] - 2026-09-18
 
