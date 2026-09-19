@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyPackagedRetrievalDefaults,
+  defaultStackWritePath,
   defaultSyntheticStackFile,
   originKeyedStackFile,
   resolveRetrievalStackFile,
@@ -155,5 +156,24 @@ describe('packaged retrieval defaults', () => {
     expect(readFileSync(unkeyed, 'utf8')).toBe('{"releaseId":"rel-unkeyed"}\n');
     applyPackagedRetrievalDefaults(env, { apiOrigin: origin, home });
     expect(readFileSync(keyed, 'utf8')).toBe('{"releaseId":"rel-keyed"}\n');
+  });
+
+  it('points CLI write paths at origin-keyed files when the desktop API origin is set', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-cli-'));
+    directories.push(home);
+    const origin = 'https://agent-auth.jianghua.site';
+    const env: NodeJS.ProcessEnv = { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: origin };
+    expect(defaultStackWritePath('retrieval-hydrate.json', env, home)).toBe(
+      originKeyedStackFile('retrieval-hydrate.json', origin, home),
+    );
+    expect(defaultStackWritePath('retrieval-index.json', {}, home)).toBe(
+      defaultSyntheticStackFile('retrieval-index.json', home),
+    );
+    const hydrateCli = readFileSync(path.join(desktopRoot, '../../scripts/sync-retrieval-hydrate.ts'), 'utf8');
+    const embedCli = readFileSync(path.join(desktopRoot, '../../scripts/embed-retrieval-index.ts'), 'utf8');
+    const questionsCli = readFileSync(path.join(desktopRoot, '../../scripts/enrich-retrieval-questions.ts'), 'utf8');
+    expect(hydrateCli).toContain("defaultStackWritePath('retrieval-hydrate.json')");
+    expect(embedCli).toContain("defaultStackWritePath('retrieval-embeddings.json')");
+    expect(questionsCli).toContain("defaultStackWritePath('retrieval-index.json')");
   });
 });

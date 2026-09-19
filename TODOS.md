@@ -111,7 +111,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 本机路径已冻结。P7 续刀：按 `apiOrigin` 分文件；产品模式会把未带后缀的旧目录拷进带后缀路径后再写。多公司 PG 分库未做。
+**Status:** 本机路径已冻结。P7 续刀：产品模式与检索 CLI（有 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` 时）都写带 origin 后缀的仓外文件。多公司 PG 分库未做。
 
 ### P8 · Windows DRAFT 与启动代码冲突
 

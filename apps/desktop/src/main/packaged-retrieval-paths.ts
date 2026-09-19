@@ -55,6 +55,17 @@ export const DEFAULT_HYDRATE_INDEX_PATH = defaultSyntheticStackFile('retrieval-h
 export const DEFAULT_EMBEDDING_INDEX_PATH = defaultSyntheticStackFile('retrieval-embeddings.json');
 export const DEFAULT_RETRIEVAL_PREFERENCE_PATH = defaultSyntheticStackFile('retrieval-preference.json');
 
+/** CLI / desktop write target. Honors CUSTOMER_AGENT_DESKTOP_API_ORIGIN. */
+export function defaultStackWritePath(
+  name: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+): string {
+  const origin = (env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN ?? '').trim();
+  if (origin.length > 0) return seedOriginKeyedStackFile(name, origin, home);
+  return defaultSyntheticStackFile(name, home);
+}
+
 /**
  * Product-mode startup (packaged or `pnpm dev` with loopback origins) must not
  * depend on a developer shell exporting retrieval paths. Existing off-repo
