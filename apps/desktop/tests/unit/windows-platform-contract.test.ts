@@ -62,6 +62,14 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(m5).toContain('%APPDATA%');
     expect(m5).toContain('~/.config');
     expect(m5).toContain('不把那些路径记成本节通过');
+    const mergeOrder = readFileSync(
+      path.join(repositoryRoot, 'docs/plans/2026-09-19-local-unpushed-merge-order.md'),
+      'utf8',
+    );
+    expect(mergeOrder).toContain('feat/p7-publish-desktop-origin');
+    expect(mergeOrder).toContain('feat/p7-embeddings-delivery');
+    expect(mergeOrder).toContain('不要合');
+    expect(mergeOrder).toContain('feat/p10-m5-userdata-note');
   });
 
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {

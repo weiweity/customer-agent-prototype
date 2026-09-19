@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 包内后端仍不做。userData 路径已按平台对齐。M5 配置行仍只验 macOS，并注明 Win/Linux 路径不是该节通过证据。
+**Status:** OPEN · 包内后端仍不做。userData 路径已按平台对齐。本地未 push 合入顺序见 `docs/plans/2026-09-19-local-unpushed-merge-order.md`。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 
