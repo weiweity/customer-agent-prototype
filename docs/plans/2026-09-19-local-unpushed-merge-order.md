@@ -1,4 +1,4 @@
-# 本地未 push 分支合入顺序
+# 合入顺序记录
 
 > **状态：** 已合入 `origin/main` `58dfac4`（PR #135–#141、#143）。#142 因 how-to 基线分支被删关掉，由 #143 承接。
 > **仍不要合：** `feat/p7-embeddings-delivery`。

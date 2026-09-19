@@ -55,6 +55,7 @@ All notable changes to this customer-agent product implementation repository are
 - Linux overlay feasibility smoke does not call `capturePage` (Xvfb raises UnknownVizError). Windows still checks corner alpha.
 - Merge-order note records the landed PRs on `origin/main` `58dfac4`. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
 - Retrieval how-tos name origin-keyed catalog files when the desktop API origin is set. See `docs/how-to-run-macos-semantic-query.md`.
+- Desktop retrieval explanation states product-mode catalogs are keyed by API origin. See `docs/explanation-desktop-retrieval.md`.
 
 ## [0.3.3] - 2026-09-18
 

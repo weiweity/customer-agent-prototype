@@ -274,5 +274,10 @@ describe('packaged retrieval defaults', () => {
     expect(howto).toContain('retrieval-index.<origin>.json');
     expect(howto).toContain('retrieval-hydrate.<origin>.json');
     expect(howto).toContain('只读带后缀路径');
+    const explanation = readFileSync(
+      path.join(desktopRoot, '../../docs/explanation-desktop-retrieval.md'),
+      'utf8',
+    );
+    expect(explanation).toContain('retrieval-*.<origin>.json');
   });
 });
