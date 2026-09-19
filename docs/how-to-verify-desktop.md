@@ -224,6 +224,8 @@ W6 的 GitHub Actions `Windows feasibility smoke` 在 hosted Windows runner 上�
 
 禁止把未签名产物写成已签名或可外发。不含 PostgreSQL。
 
+CI `Linux feasibility smoke` 在 ubuntu-latest 上跑 `pnpm package:linux`。它比「脚本存在」多证明一次 Linux hosted 构建图，仍不是桌面会话、IME、签名或 [远端勾选](how-to-linux-packaged-product-remote.md)。
+
 ### 3.5 W6 正式服务候选产物
 
 ```bash

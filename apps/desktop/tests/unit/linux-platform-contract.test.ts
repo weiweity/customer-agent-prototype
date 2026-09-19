@@ -66,6 +66,10 @@ describe('Linux local-unsigned packaging contract', () => {
     expect(verifyDesktop).toContain('### 3.4 `pnpm package:linux`');
     expect(verifyDesktop).toContain('须在 **Linux** 上跑');
     expect(verifyDesktop).toContain('### 3.5 W6 正式服务候选产物');
+    const ci = readFileSync(path.join(repositoryRoot, '.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toContain('linux-feasibility:');
+    expect(ci).toContain('pnpm package:linux');
+    expect(ci).toContain('linux-feasibility]');
   });
 
   it('cleans only release/local-unsigned/linux and keeps sibling artifacts', () => {
