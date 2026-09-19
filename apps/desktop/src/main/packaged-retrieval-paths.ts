@@ -114,6 +114,10 @@ export function applyPackagedRetrievalDefaults(
     home?: string;
   } = {},
 ): void {
+  const origin = (paths.apiOrigin ?? '').trim();
+  if (origin.length > 0 && (env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN ?? '').trim().length === 0) {
+    env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN = origin;
+  }
   const hydrate = paths.hydrate ?? stackPath('retrieval-hydrate.json', paths);
   const index = paths.index ?? stackPath('retrieval-index.json', paths);
   const embeddings = paths.embeddings ?? stackPath('retrieval-embeddings.json', paths);

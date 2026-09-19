@@ -39,6 +39,16 @@ describe('packaged retrieval defaults', () => {
     expect(env.CUSTOMER_AGENT_RETRIEVAL_INDEX).toBe('/tmp/from-shell-index.json');
   });
 
+  it('does not overwrite an existing desktop API origin', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-keep-origin-'));
+    directories.push(home);
+    const env: NodeJS.ProcessEnv = {
+      CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'https://already.example',
+    };
+    applyPackagedRetrievalDefaults(env, { apiOrigin: 'https://agent-auth.jianghua.site', home });
+    expect(env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN).toBe('https://already.example');
+  });
+
   it('points packaged env at existing off-repo files and ignores shell paths', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-present-'));
     directories.push(root);
@@ -106,6 +116,7 @@ describe('packaged retrieval defaults', () => {
     directories.push(home);
     const env: NodeJS.ProcessEnv = {};
     applyPackagedRetrievalDefaults(env, { apiOrigin: 'https://agent-auth.jianghua.site', home });
+    expect(env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN).toBe('https://agent-auth.jianghua.site');
     expect(env.CUSTOMER_AGENT_HYDRATE_INDEX).toBe(
       originKeyedStackFile('retrieval-hydrate.json', 'https://agent-auth.jianghua.site', home),
     );

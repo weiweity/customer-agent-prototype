@@ -21,6 +21,7 @@ All notable changes to this customer-agent product implementation repository are
 - Login fills missing answer embeddings in the background when MiniMax is configured; query uses the dense lane without blocking login. See `docs/plans/2026-09-19-p7-login-embeddings.md`.
 - Query corpus loading (`loadIndexScripts`) follows origin-keyed BM25 files when env is unset. See `docs/plans/2026-09-19-p7-index-scripts-origin.md`.
 - Product-remote search does not fall back to leftover `/v1/search` when a desktop API origin is set. See `docs/plans/2026-09-19-p7-origin-no-leftover-search.md`.
+- Product mode publishes `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` from the runtime profile when unset. See `docs/plans/2026-09-19-p7-publish-desktop-origin.md`.
 
 ## [0.3.3] - 2026-09-18
 
