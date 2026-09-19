@@ -121,7 +121,7 @@ export function QueryApp() {
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
-  const [announce, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
+  const [, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
   const [announceInvalid, setAnnounceInvalid] = useState(false);
   const announceGenerationRef = useRef(0);
   const announceReleaseRef = useRef<string | null>(null);
