@@ -2,11 +2,13 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
-## [0.3.4] - 2026-09-18
+## [0.3.6] - 2026-09-19
 
 ### Fixed
 
 - After login, a source_gate or unavailable announce drop during search shows “内容暂不可用” / “服务暂不可用” instead of a blank overlay. It still does not show “当前版本已失效”.
+
+## [0.3.4] - 2026-09-18
 
 ### Changed
 
