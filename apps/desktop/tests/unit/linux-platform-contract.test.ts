@@ -70,6 +70,10 @@ describe('Linux local-unsigned packaging contract', () => {
     expect(ci).toContain('linux-feasibility:');
     expect(ci).toContain('pnpm package:linux');
     expect(ci).toContain('linux-feasibility]');
+    expect(ci).toContain('xvfb-run');
+    expect(ci).toContain('@linux-feasibility');
+    const smoke = readFileSync(path.join(root, 'tests/e2e/smoke.spec.ts'), 'utf8');
+    expect(smoke).toContain('@linux-feasibility');
   });
 
   it('cleans only release/local-unsigned/linux and keeps sibling artifacts', () => {

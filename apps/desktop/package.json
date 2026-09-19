@@ -15,6 +15,7 @@
     "test:assets": "vitest run tests/unit/fox-head-assets.test.ts tests/unit/app-identity.test.ts",
     "test:e2e:float": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @float",
     "test:e2e:windows-feasibility": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @windows-feasibility",
+    "test:e2e:linux-feasibility": "pnpm build && playwright test tests/e2e/smoke.spec.ts --grep @linux-feasibility",
     "build": "electron-vite build",
     "generate:mac-icon": "sh scripts/generate-mac-icon.sh",
     "generate:fox-head": "node scripts/generate-fox-head.mjs",

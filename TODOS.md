@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 包内后端仍不做。CI Ubuntu 会跑 `package:linux` 可行性烟测，不是正式发布。
+**Status:** OPEN · 包内后端仍不做。CI Ubuntu 会 `package:linux` 并 xvfb overlay smoke。不是 Pilot。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 

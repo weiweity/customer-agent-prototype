@@ -22,6 +22,7 @@ All notable changes to this customer-agent product implementation repository are
 - Linux packaging cleans temporary CA state when a step fails. See `docs/plans/2026-09-19-p10-package-linux-ca-cleanup.md`.
 - `how-to-verify-desktop` documents `pnpm package:linux` as Linux-host local-unsigned only. See `docs/plans/2026-09-19-p10-package-linux-verify-howto.md`.
 - CI runs `pnpm package:linux` on Ubuntu as a feasibility smoke, not a signed release. See `docs/plans/2026-09-19-p10-linux-ci-package.md`.
+- Linux CI overlay smoke runs under xvfb after packaging. See `docs/plans/2026-09-19-p10-linux-e2e-smoke.md`.
 
 ## [0.3.3] - 2026-09-18
 

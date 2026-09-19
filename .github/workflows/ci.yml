@@ -170,10 +170,16 @@ jobs:
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm package:linux
       - if: needs.changes.outputs.mode == 'full'
+        name: Install Xvfb
+        run: sudo apt-get update && sudo apt-get install --yes xvfb
+      - if: needs.changes.outputs.mode == 'full'
+        name: Smoke the desktop output just built by packaging
+        run: xvfb-run --auto-servernum pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/smoke.spec.ts --grep @linux-feasibility
+      - if: needs.changes.outputs.mode == 'full'
         name: State evidence boundary
         run: |
-          echo "PASS: hosted Ubuntu local-unsigned Linux package postconditions."
-          echo "NOT PROVEN: desktop session, IME, signing, update, Pilot, or product-remote login."
+          echo "PASS: hosted Ubuntu local-unsigned Linux package postconditions, overlay smoke, shortcut registration, clean exit."
+          echo "NOT PROVEN: IME, signing, update, Pilot, or product-remote login."
 
   gate:
     name: CI gate

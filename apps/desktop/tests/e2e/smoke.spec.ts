@@ -677,7 +677,7 @@ test('documents that globalShortcut is exercised via the same main harness, not 
   }
 });
 
-test('@windows-feasibility launches transparent overlays, registers the shortcut, and exits cleanly', async () => {
+test('@windows-feasibility @linux-feasibility launches transparent overlays, registers the shortcut, and exits cleanly', async () => {
   const app = await launchApp();
   try {
     const fox = await waitForRole(app, 'fox');

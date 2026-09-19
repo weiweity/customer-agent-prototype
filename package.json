@@ -20,6 +20,7 @@
     "test:assets": "pnpm --filter @customer-agent/desktop test:assets",
     "test:e2e:float": "pnpm --filter @customer-agent/desktop test:e2e:float",
     "test:e2e:windows-feasibility": "pnpm --filter @customer-agent/desktop test:e2e:windows-feasibility",
+    "test:e2e:linux-feasibility": "pnpm --filter @customer-agent/desktop test:e2e:linux-feasibility",
     "build": "pnpm build:services && pnpm --filter @customer-agent/desktop build",
     "preview": "pnpm --filter @customer-agent/desktop preview",
     "test:e2e": "pnpm --filter @customer-agent/desktop test:e2e",
