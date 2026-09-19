@@ -121,7 +121,9 @@ export class ProductAnnounce implements AnnounceGate {
       const persisted = this.persistHydrate(response.current_release_id, items);
       if (replaced || persisted?.wrote) for (const listener of this.listeners) listener();
       try {
-        this.afterSnapshotPersist(response.current_release_id, items);
+        if (persisted?.reason === 'wrote' || persisted?.reason === 'aligned') {
+          this.afterSnapshotPersist(response.current_release_id, items);
+        }
       } catch {
         // Embeddings are best-effort; hydrate/index already persisted.
       }

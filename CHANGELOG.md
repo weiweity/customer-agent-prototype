@@ -24,6 +24,7 @@ All notable changes to this customer-agent product implementation repository are
 - Product mode publishes `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` from the runtime profile when unset. See `docs/plans/2026-09-19-p7-publish-desktop-origin.md`.
 - Seeding an origin-keyed catalog from a leftover unkeyed file is best-effort; a copy failure does not abort packaged startup. See `docs/plans/2026-09-19-p7-seed-copy-best-effort.md`.
 - Dashboard, dense catalog, and telemetry reads do not fall back to leftover unkeyed files when the desktop API origin is set. See `docs/plans/2026-09-19-p7-runtime-no-unkeyed.md`.
+- Login schedules background embeddings only after hydrate writes or already matches the snapshot, not when a smaller seed is kept out. See `docs/plans/2026-09-19-p7-embed-after-persist.md`.
 
 ## [0.3.3] - 2026-09-18
 
