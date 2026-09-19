@@ -4,6 +4,10 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [0.3.4] - 2026-09-18
 
+### Fixed
+
+- After login, a source_gate or unavailable announce drop during search shows “内容暂不可用” / “服务暂不可用” instead of a blank overlay. It still does not show “当前版本已失效”.
+
 ### Changed
 
 - Query treats only an expired announce lease as “当前版本已失效”. Login-time source_gate / unavailable no longer looks like a stale release.
