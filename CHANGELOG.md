@@ -28,6 +28,7 @@ All notable changes to this customer-agent product implementation repository are
 - Login schedules background embeddings only after hydrate writes or already matches the snapshot, not when a smaller seed is kept out. See `docs/plans/2026-09-19-p7-embed-after-persist.md`.
 - Login persist does not write a smaller BM25 index or report `wrote` when hydrate keeps a larger local catalog. See `docs/plans/2026-09-19-p7-persist-no-shrink.md`.
 - Query BM25 fallback loads origin-keyed retrieval-index files instead of only `CUSTOMER_AGENT_RETRIEVAL_INDEX`. See `docs/plans/2026-09-19-p7-semantic-origin-path.md`.
+- On Windows, collapsing Query yields the previous app by hiding the idle fox for one frame, then `showInactive`. It does not call `app.hide()` or `app.focus({ steal: true })`. Not a Windows device pass. See `docs/plans/2026-09-19-windows-yield-focus.md`.
 - M5 lists `product-remote` as a separate re-verify table, all **未观察**. `synthetic-offline` cannot tick login / search / copy. See `docs/how-to-verify-macos-m5.md` §7.1.
 - Packaged and unpackaged desktop can use a `product-remote` HTTPS origin (no IP, no public HTTP, no userinfo). The API still binds `127.0.0.1`. Session files are keyed by API origin. See `docs/how-to-p4-remote-mac.md`.
 
