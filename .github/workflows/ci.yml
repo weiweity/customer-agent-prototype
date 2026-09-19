@@ -170,8 +170,11 @@ jobs:
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm package:linux
       - if: needs.changes.outputs.mode == 'full'
-        name: Install Xvfb
-        run: sudo apt-get update && sudo apt-get install --yes xvfb
+        name: Install Xvfb and Electron runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb
+          pnpm --filter @customer-agent/desktop exec playwright install-deps
       - if: needs.changes.outputs.mode == 'full'
         name: Smoke the desktop output just built by packaging
         run: xvfb-run --auto-servernum pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/smoke.spec.ts --grep @linux-feasibility
