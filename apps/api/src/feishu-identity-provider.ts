@@ -56,14 +56,15 @@ export function createFeishuIdentityProvider(
 
   function assertFeishuResponseHost(response: Response): void {
     const raw = response.url;
-    if (!raw) return;
-    let hostname: string;
+    if (!raw) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
+    let parsed: URL;
     try {
-      hostname = new URL(raw).hostname;
+      parsed = new URL(raw);
     } catch {
       throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
     }
-    if (!FEISHU_RESPONSE_HOSTS.has(hostname)) {
+    if (parsed.protocol !== 'https:' || (parsed.port !== '' && parsed.port !== '443')
+      || !FEISHU_RESPONSE_HOSTS.has(parsed.hostname)) {
       throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
     }
   }
@@ -86,7 +87,7 @@ export function createFeishuIdentityProvider(
       try {
         const tokenResponse = await fetchImpl(FEISHU_TOKEN_URL, {
           method: 'POST',
-          redirect: 'follow',
+          redirect: 'error',
           signal: controller.signal,
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -117,8 +118,10 @@ export function createFeishuIdentityProvider(
         if (name) {
           try {
             persistOperatorDisplayName(`usr_${openId}`.slice(0, 128), name);
-          } catch {
+          } catch (error) {
             // Display name is best-effort; a write failure must not fail login.
+            const persistName = error instanceof Error ? error.name : 'unknown';
+            console.info(`[api] operator display name persist failed: ${persistName}`);
           }
         }
         return openId;

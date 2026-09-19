@@ -16,9 +16,15 @@ const config = Object.freeze({
 });
 const openId = 'ou_8f5c2a0000000001';
 
-function jsonResponse(body: unknown, status = 200, url = '') {
+function jsonResponse(body: unknown, url: string, status = 200) {
   const response = new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  if (url) Object.defineProperty(response, 'url', { value: url });
+  Object.defineProperty(response, 'url', { value: url });
+  return response;
+}
+
+function statusResponse(status: number, url: string) {
+  const response = new Response('', { status });
+  Object.defineProperty(response, 'url', { value: url });
   return response;
 }
 
@@ -45,7 +51,7 @@ describe('feishu identity provider', () => {
     const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url === FEISHU_TOKEN_URL) {
-        expect(init?.redirect).toBe('follow');
+        expect(init?.redirect).toBe('error');
         const body = JSON.parse(String(init?.body)) as Record<string, string>;
         expect(body).toEqual({
           grant_type: 'authorization_code',
@@ -54,12 +60,12 @@ describe('feishu identity provider', () => {
           code: 'one-time-code',
           redirect_uri: config.redirectUri,
         });
-        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' });
+        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
       }
       if (url === FEISHU_USER_INFO_URL) {
         expect(init?.redirect).toBe('follow');
         expect(init?.headers).toMatchObject({ authorization: 'Bearer user-access-token' });
-        return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, 200, 'https://open.feishu.cn/open-apis/authen/v1/user_info');
+        return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, FEISHU_USER_INFO_URL);
       }
       throw new Error(`unexpected ${url}`);
     }) as unknown as typeof fetch;
@@ -72,10 +78,10 @@ describe('feishu identity provider', () => {
   });
 
   it('treats rejected codes as LOGIN_INVALID and transport faults as unavailable', async () => {
-    const unauthorized = createFeishuIdentityProvider(config, async () => new Response('', { status: 401 }));
+    const unauthorized = createFeishuIdentityProvider(config, async () => statusResponse(401, FEISHU_TOKEN_URL));
     try { await expect(unauthorized.exchange('code')).rejects.toMatchObject({ reason: 'LOGIN_INVALID' }); }
     finally { unauthorized.close(); }
-    const unavailable = createFeishuIdentityProvider(config, async () => new Response('', { status: 503 }));
+    const unavailable = createFeishuIdentityProvider(config, async () => statusResponse(503, FEISHU_TOKEN_URL));
     try { await expect(unavailable.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' }); }
     finally { unavailable.close(); }
   });
@@ -84,7 +90,7 @@ describe('feishu identity provider', () => {
     { code: 0, token_type: 'Bearer' },
     { code: 1, token_type: 'Bearer', access_token: 'user-access-token' },
   ])('fails closed when the token receipt is not a bearer access token', async (body) => {
-    const provider = createFeishuIdentityProvider(config, async () => jsonResponse(body));
+    const provider = createFeishuIdentityProvider(config, async () => jsonResponse(body, FEISHU_TOKEN_URL));
     try { await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' }); }
     finally { provider.close(); }
   });
@@ -96,9 +102,9 @@ describe('feishu identity provider', () => {
   ])('fails closed when user_info does not yield a Feishu open_id', async (body) => {
     const fetchImpl = vi.fn(async (input: string | URL | Request) => {
       if (String(input) === FEISHU_TOKEN_URL) {
-        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' });
+        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
       }
-      return jsonResponse(body);
+      return jsonResponse(body, FEISHU_USER_INFO_URL);
     }) as unknown as typeof fetch;
     const provider = createFeishuIdentityProvider(config, fetchImpl);
     try { await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' }); }
@@ -114,9 +120,9 @@ describe('feishu identity provider', () => {
           token_type: 'Bearer',
           access_token: accessToken,
           refresh_token: `r-${'b'.repeat(2000)}`,
-        });
+        }, FEISHU_TOKEN_URL);
       }
-      return jsonResponse({ code: 0, data: { open_id: openId } });
+      return jsonResponse({ code: 0, data: { open_id: openId } }, FEISHU_USER_INFO_URL);
     }) as unknown as typeof fetch;
     const provider = createFeishuIdentityProvider(config, fetchImpl);
     try {
@@ -129,13 +135,61 @@ describe('feishu identity provider', () => {
   it('rejects a Feishu response that settles on a non-Feishu host', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(
       { code: 0, token_type: 'Bearer', access_token: 'user-access-token' },
-      200,
       'https://example.com/stolen',
     )) as unknown as typeof fetch;
     const provider = createFeishuIdentityProvider(config, fetchImpl);
     try {
       await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
-      expect(fetchImpl).toHaveBeenCalledWith(FEISHU_TOKEN_URL, expect.objectContaining({ redirect: 'follow' }));
+      expect(fetchImpl).toHaveBeenCalledWith(FEISHU_TOKEN_URL, expect.objectContaining({ redirect: 'error' }));
+    } finally { provider.close(); }
+  });
+
+  it('accepts a Feishu response that settles on accounts.feishu.cn', async () => {
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      if (String(input) === FEISHU_TOKEN_URL) {
+        return jsonResponse(
+          { code: 0, token_type: 'Bearer', access_token: 'user-access-token' },
+          'https://accounts.feishu.cn/open-apis/authen/v2/oauth/token',
+        );
+      }
+      return jsonResponse({ code: 0, data: { open_id: openId } }, FEISHU_USER_INFO_URL);
+    }) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      expect(await provider.exchange('one-time-code')).toBe(openId);
+    } finally { provider.close(); }
+  });
+
+  it('rejects a Feishu response whose final URL cannot be parsed', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(
+      { code: 0, token_type: 'Bearer', access_token: 'user-access-token' },
+      'not a url',
+    )) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
+    } finally { provider.close(); }
+  });
+
+  it('rejects a Feishu response with an empty URL', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(
+      { code: 0, token_type: 'Bearer', access_token: 'user-access-token' },
+      '',
+    )) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
+    } finally { provider.close(); }
+  });
+
+  it('rejects a Feishu response that settles on http', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(
+      { code: 0, token_type: 'Bearer', access_token: 'user-access-token' },
+      'http://open.feishu.cn/open-apis/authen/v2/oauth/token',
+    )) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
     } finally { provider.close(); }
   });
 
@@ -145,9 +199,9 @@ describe('feishu identity provider', () => {
     });
     const fetchImpl = vi.fn(async (input: string | URL | Request) => {
       if (String(input) === FEISHU_TOKEN_URL) {
-        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, 200, FEISHU_TOKEN_URL);
+        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
       }
-      return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, 200, FEISHU_USER_INFO_URL);
+      return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, FEISHU_USER_INFO_URL);
     }) as unknown as typeof fetch;
     const provider = createFeishuIdentityProvider(config, fetchImpl);
     try {
