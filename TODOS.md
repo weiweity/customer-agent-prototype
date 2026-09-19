@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 包内后端仍不做。`package:linux` 第一刀：Linux 上 local-unsigned AppImage。见 `docs/plans/2026-09-19-p10-package-linux-local.md`。
+**Status:** OPEN · 包内后端仍不做。`package:linux` 失败须清临时 CA。见 `docs/plans/2026-09-19-p10-package-linux-ca-cleanup.md`。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 

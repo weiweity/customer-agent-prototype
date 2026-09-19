@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetLinuxPackageOutput } from '../../scripts/package-linux.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -73,5 +73,83 @@ describe('Linux local-unsigned packaging contract', () => {
     expect(resetLinuxPackageOutput(fixtureRoot)).toBe(linuxOutput);
     expect(existsSync(linuxOutput)).toBe(false);
     expect(readFileSync(path.join(siblingOutput, 'preserve.txt'), 'utf8')).toBe('preserve');
+  });
+
+  it.each([
+    { stage: 'Electron distribution preparation', failAtCommand: 1 },
+    { stage: 'icon generation', failAtCommand: 2 },
+    { stage: 'contracts runtime build', failAtCommand: 3 },
+    { stage: 'renderer build', failAtCommand: 4 },
+    { stage: 'electron-builder', failAtCommand: 5 },
+    { stage: 'package verifier', failAtCommand: 6 },
+  ])('cleans the temporary CA state when $stage fails and stops later commands', async ({
+    failAtCommand,
+  }) => {
+    const { packageLinux } = await import(
+      pathToFileURL(path.join(root, 'scripts/package-linux.mjs')).href
+    );
+    const failure = new Error(`command ${failAtCommand} failed`);
+    const cleanup = vi.fn();
+    const resetOutput = vi.fn(() => '/tmp/linux-output');
+    const runCommand = vi.fn(() => {
+      if (runCommand.mock.calls.length === failAtCommand) {
+        throw failure;
+      }
+    });
+    expect(() => packageLinux('local', {
+      platform: 'linux',
+      prepareSystemCa: () => ({ environment: {}, cleanup }),
+      runCommand,
+      resetOutput,
+      assertMainBundle: vi.fn(),
+    })).toThrow(failure);
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(runCommand).toHaveBeenCalledTimes(failAtCommand);
+    if (failAtCommand < 5) {
+      expect(resetOutput).not.toHaveBeenCalled();
+    } else {
+      expect(resetOutput).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('cleans the temporary CA state when output reset fails before electron-builder', async () => {
+    const { packageLinux } = await import(
+      pathToFileURL(path.join(root, 'scripts/package-linux.mjs')).href
+    );
+    const failure = new Error('output reset failed');
+    const cleanup = vi.fn();
+    const runCommand = vi.fn();
+    expect(() => packageLinux('local', {
+      platform: 'linux',
+      prepareSystemCa: () => ({ environment: {}, cleanup }),
+      runCommand,
+      assertMainBundle: vi.fn(),
+      resetOutput: () => {
+        throw failure;
+      },
+    })).toThrow(failure);
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(runCommand).toHaveBeenCalledTimes(4);
+  });
+
+  it('stops packaging when the main bundle still imports workspace packages', async () => {
+    const { packageLinux } = await import(
+      pathToFileURL(path.join(root, 'scripts/package-linux.mjs')).href
+    );
+    const cleanup = vi.fn();
+    const resetOutput = vi.fn();
+    const runCommand = vi.fn();
+    expect(() => packageLinux('local', {
+      platform: 'linux',
+      prepareSystemCa: () => ({ environment: {}, cleanup }),
+      runCommand,
+      resetOutput,
+      assertMainBundle: () => {
+        throw new Error('workspace import');
+      },
+    })).toThrow('workspace import');
+    expect(resetOutput).not.toHaveBeenCalled();
+    expect(runCommand).toHaveBeenCalledTimes(4);
+    expect(cleanup).toHaveBeenCalledOnce();
   });
 });
