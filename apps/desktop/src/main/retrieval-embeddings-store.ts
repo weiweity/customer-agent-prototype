@@ -16,7 +16,7 @@ import type { RetrievalScript } from '../shared/hybrid-retrieve.ts';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
 import { EMBED_BATCH, minimaxEmbed, type EmbedKind } from './minimax-embed.ts';
 import type { MinimaxChatOptions } from './minimax-chat.ts';
-import { DEFAULT_EMBEDDING_INDEX_PATH } from './packaged-retrieval-paths.ts';
+import { DEFAULT_EMBEDDING_INDEX_PATH, envOrOriginStackFile } from './packaged-retrieval-paths.ts';
 
 export const DEFAULT_EMBED_PATH = DEFAULT_EMBEDDING_INDEX_PATH;
 
@@ -42,7 +42,9 @@ function writeAtomic(path: string, body: string): void {
   renameSync(tempPath, path);
 }
 
-export function loadDenseCatalog(path = process.env.CUSTOMER_AGENT_EMBEDDING_INDEX ?? DEFAULT_EMBED_PATH): DenseCatalog | null {
+export function loadDenseCatalog(
+  path = envOrOriginStackFile('CUSTOMER_AGENT_EMBEDDING_INDEX', 'retrieval-embeddings.json'),
+): DenseCatalog | null {
   if (!path || path.trim().length === 0 || !existsSync(path)) return null;
   try {
     return parseDenseCatalog(readFileSync(path, 'utf8'));

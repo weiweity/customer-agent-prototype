@@ -66,6 +66,19 @@ export function defaultStackWritePath(
   return defaultSyntheticStackFile(name, home);
 }
 
+/** Read path: explicit env, else origin-keyed file, else leftover unkeyed. */
+export function envOrOriginStackFile(
+  envName: string,
+  name: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+): string {
+  const explicit = (env[envName] ?? '').trim();
+  if (explicit.length > 0) return explicit;
+  const origin = (env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN ?? '').trim();
+  return resolveRetrievalStackFile(name, origin.length > 0 ? origin : undefined, home);
+}
+
 /**
  * Product-mode startup (packaged or `pnpm dev` with loopback origins) must not
  * depend on a developer shell exporting retrieval paths. Existing off-repo

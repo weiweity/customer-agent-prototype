@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProductCandidate } from '../shared/product-search';
 import type { RankedRetrieval, RetrievalScript } from '../shared/hybrid-retrieve';
 import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
+import { DEFAULT_HYDRATE_INDEX_PATH } from './packaged-retrieval-paths.ts';
 
 export type HydrateCatalog = Readonly<{
   releaseId: string;
@@ -14,7 +14,7 @@ export type HydrateCatalog = Readonly<{
 }>;
 
 export const HYDRATE_CATALOG_VERSION = 1;
-export const DEFAULT_HYDRATE_PATH = join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-hydrate.json');
+export const DEFAULT_HYDRATE_PATH = DEFAULT_HYDRATE_INDEX_PATH;
 
 export type HydrateSnapshotItem = Readonly<{
   script_id: string;

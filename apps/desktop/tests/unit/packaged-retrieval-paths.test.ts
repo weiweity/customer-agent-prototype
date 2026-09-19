@@ -8,6 +8,7 @@ import {
   applyPackagedRetrievalDefaults,
   defaultStackWritePath,
   defaultSyntheticStackFile,
+  envOrOriginStackFile,
   originKeyedStackFile,
   resolveRetrievalStackFile,
   resolveStackFile,
@@ -175,5 +176,23 @@ describe('packaged retrieval defaults', () => {
     expect(hydrateCli).toContain("defaultStackWritePath('retrieval-hydrate.json')");
     expect(embedCli).toContain("defaultStackWritePath('retrieval-embeddings.json')");
     expect(questionsCli).toContain("defaultStackWritePath('retrieval-index.json')");
+  });
+
+  it('lets dashboard and dense load resolve origin-keyed files when env is unset', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-read-'));
+    directories.push(home);
+    mkdirSync(path.join(home, '.customer-agent-synthetic-stack'));
+    const origin = 'https://agent-auth.jianghua.site';
+    const keyed = originKeyedStackFile('retrieval-hydrate.json', origin, home);
+    writeFileSync(keyed, '{}\n');
+    const env: NodeJS.ProcessEnv = { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: origin };
+    expect(envOrOriginStackFile('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json', env, home)).toBe(keyed);
+    env.CUSTOMER_AGENT_HYDRATE_INDEX = '/tmp/explicit-hydrate.json';
+    expect(envOrOriginStackFile('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json', env, home))
+      .toBe('/tmp/explicit-hydrate.json');
+    const wording = readFileSync(path.join(desktopRoot, 'src/main/dashboard-wording.ts'), 'utf8');
+    const dense = readFileSync(path.join(desktopRoot, 'src/main/retrieval-embeddings-store.ts'), 'utf8');
+    expect(wording).toContain("envOrOriginStackFile('CUSTOMER_AGENT_HYDRATE_INDEX'");
+    expect(dense).toContain("envOrOriginStackFile('CUSTOMER_AGENT_EMBEDDING_INDEX'");
   });
 });
