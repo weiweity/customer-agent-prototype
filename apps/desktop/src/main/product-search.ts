@@ -16,6 +16,7 @@ import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrie
 import { DEFAULT_RETRIEVAL_PREFERENCE_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog.ts';
 import { loadMinimaxReranker, type Reranker } from './minimax-rerank';
+import { liveDenseQueryRanker } from './retrieval-embeddings-store.ts';
 import { createRetrievalPipeline, loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
 import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
 import { loadRetrievalTelemetryStore, type RetrievalTelemetry } from './retrieval-telemetry-store.ts';
@@ -135,7 +136,9 @@ export class ProductSearch {
     const scripts = indexScripts.length >= hydrateScripts.length && indexScripts.length > 0
       ? indexScripts
       : hydrateScripts;
-    this.activePipeline = scripts.length > 0 ? createRetrievalPipeline(scripts) : this.pipeline;
+    this.activePipeline = scripts.length > 0
+      ? createRetrievalPipeline(scripts, { dense: liveDenseQueryRanker() })
+      : this.pipeline;
   }
   forget(sender: number) {
     this.states.get(sender)?.controller.abort();

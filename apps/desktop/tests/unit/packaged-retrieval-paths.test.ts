@@ -74,6 +74,7 @@ describe('packaged retrieval defaults', () => {
   it('applies defaults after the product profile and before search IPC', () => {
     const main = readFileSync(path.join(desktopRoot, 'src/main/main.ts'), 'utf8');
     expect(main).toContain('applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin })');
+    expect(main).toContain('scheduleRetrievalEmbeddingsFromEnv');
     const searchIpc = readFileSync(path.join(desktopRoot, 'src/main/product-search-ipc.ts'), 'utf8');
     expect(searchIpc).not.toMatch(/^const preferenceStore = loadRetrievalPreferenceStore/m);
     expect(main).not.toContain('if (app.isPackaged) applyPackagedRetrievalDefaults(process.env);');
