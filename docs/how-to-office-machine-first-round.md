@@ -6,6 +6,8 @@
 
 若本机合成栈要给打包客户端写配置，路径必须是 Electron userData：Windows `%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`，不是 macOS 的 `Library/Application Support`。
 
+安装包**不含** PostgreSQL、API、worker。办公机不要另装数据库来「补主链」。产品主链走远端配置（P4），检索由登录交付（P7）；包内后端（P10）本轮不做。
+
 安装包**禁止外发**、未签名，文件名带 `UNSIGNED`。不要写成已签名或可给客户。
 
 ## 准备

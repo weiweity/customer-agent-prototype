@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。打包态远端勾选（未观察）：macOS / Windows 办公机 / Linux。`package:linux` 须在 Linux 上跑。账号第二条隧道 / API 绑 `0.0.0.0` 仍未做。
+**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。第二刀（`feat/p4-account-https`）：账号 POST 走独立 HTTPS identity origin，口令服务仍 loopback；超时 15s。打包态远端勾选（未观察）：macOS / Windows 办公机 / Linux。`package:linux` 须在 Linux 上跑。DNS / 第二条 ingress 按 how-to 配。API 绑 `0.0.0.0` / 办公机实装仍未做。
 
 ### P5 · 会话未绑定后端身份
 
@@ -93,12 +93,12 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Why:** 不能假设给默认 session 加一个证书钩子就覆盖所有请求。代理、证书策略与 pinning 都必须验证**实际传输路径**。
 
-**Context:** `apps/desktop/src/main/product-http.ts:23`、`apps/desktop/src/main/product-login-window.ts:21`。
+**Context:** `apps/desktop/src/main/desktop-fetch.ts`、`product-http.ts`、`product-login-window.ts`。规格：`docs/plans/2026-09-19-p6-cert-proxy-paths.md`。
 
 **Effort:** M
 **Priority:** P3
 **Depends on:** P4
-**Status:** OPEN
+**Status:** OPEN · 第一刀：ProductHttp / 登录 identity / MiniMax 共用 `electron.net.fetch`；登录隔离 session 走 `applySessionSecurity`。不做默认 pinning。
 
 ### P7 · 检索资产的交付路径
 
@@ -111,7 +111,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P2
-**Status:** 本机路径已冻结 · 远端仍 OPEN（跟 P4）
+**Status:** 本机路径已冻结。P7 续刀：origin 分文件、登录写 BM25/向量、查询按 origin 读；产品模式写入 `CUSTOMER_AGENT_DESKTOP_API_ORIGIN`。多公司 PG 分库未做。
 
 ### P8 · Windows DRAFT 与启动代码冲突
 
@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 包内后端仍不做。Linux userData 跟随 `XDG_CONFIG_HOME`。不是包内 PG。
+**Status:** OPEN · 包内后端仍不做。缺配置文案不再叫人装数据库。Linux userData 跟随 `XDG_CONFIG_HOME`。办公机远端主链 how-to 已写、全部未观察。见 `docs/how-to-office-machine-product-remote.md`、`docs/plans/2026-09-19-p10-no-bundled-stack.md`。实证仍成立：PG15 发现无 Windows 分支、Homebrew 非自包含，不能只拷 bin。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 
@@ -147,7 +147,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P3 或 P4
-**Status:** P3 段不适用主链。P4 打包态远端清单未观察：`docs/how-to-macos-packaged-product-remote.md`。不把 M5 标完成。
+**Status:** P3 段不适用主链。P4 `product-remote` 适用但 **未观察**；清单见 `docs/how-to-verify-macos-m5.md` §7.1、`docs/how-to-macos-packaged-product-remote.md`、`docs/plans/2026-09-19-p9-remote-m5.md`。本刀不把 M5 标完成，不授权再打包。
 
 ### Overlay · Windows 收起后交还前台输入框
 
@@ -160,7 +160,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P3
 **Depends on:** macOS 收起交还焦点已在 v0.3.1 / PR #120 落地
-**Status:** OPEN
+**Status:** OPEN · 第一刀：Windows 收起闲置狐狸时 `blur` + `hide` 一帧再 `showInactive`，不用 `app.hide()`、不用 `app.focus({ steal: true })`。未做 Windows 实机勾选。见 `docs/plans/2026-09-19-windows-yield-focus.md`。
 
 ### Overlay · NSPanel 隐身属性（becomesKeyOnlyIfNeeded）
 
