@@ -138,4 +138,22 @@ describe('packaged retrieval defaults', () => {
       smartEnabled: true,
     });
   });
+
+  it('copies a leftover unkeyed catalog into the keyed path and then writes only there', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-seed-'));
+    directories.push(home);
+    mkdirSync(path.join(home, '.customer-agent-synthetic-stack'));
+    const origin = 'https://agent-auth.jianghua.site';
+    const unkeyed = defaultSyntheticStackFile('retrieval-hydrate.json', home);
+    writeFileSync(unkeyed, '{"releaseId":"rel-unkeyed"}\n');
+    const env: NodeJS.ProcessEnv = {};
+    applyPackagedRetrievalDefaults(env, { apiOrigin: origin, home });
+    const keyed = originKeyedStackFile('retrieval-hydrate.json', origin, home);
+    expect(env.CUSTOMER_AGENT_HYDRATE_INDEX).toBe(keyed);
+    expect(readFileSync(keyed, 'utf8')).toBe('{"releaseId":"rel-unkeyed"}\n');
+    writeFileSync(keyed, '{"releaseId":"rel-keyed"}\n');
+    expect(readFileSync(unkeyed, 'utf8')).toBe('{"releaseId":"rel-unkeyed"}\n');
+    applyPackagedRetrievalDefaults(env, { apiOrigin: origin, home });
+    expect(readFileSync(keyed, 'utf8')).toBe('{"releaseId":"rel-keyed"}\n');
+  });
 });

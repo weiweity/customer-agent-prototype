@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 /** Off-repo stack files. Product-mode clients load these without shell env. */
 export function defaultSyntheticStackFile(name: string, home = homedir()): string {
@@ -32,6 +32,24 @@ export function resolveRetrievalStackFile(
   return keyed;
 }
 
+/**
+ * Product-mode writes must hit the keyed path. Copy a leftover unkeyed file
+ * once so the first origin does not keep mutating the shared catalog.
+ */
+export function seedOriginKeyedStackFile(
+  name: string,
+  apiOrigin: string,
+  home = homedir(),
+): string {
+  const keyed = originKeyedStackFile(name, apiOrigin, home);
+  const unkeyed = defaultSyntheticStackFile(name, home);
+  if (!existsSync(keyed) && existsSync(unkeyed)) {
+    mkdirSync(dirname(keyed), { recursive: true });
+    copyFileSync(unkeyed, keyed);
+  }
+  return keyed;
+}
+
 export const DEFAULT_RETRIEVAL_INDEX_PATH = defaultSyntheticStackFile('retrieval-index.json');
 export const DEFAULT_HYDRATE_INDEX_PATH = defaultSyntheticStackFile('retrieval-hydrate.json');
 export const DEFAULT_EMBEDDING_INDEX_PATH = defaultSyntheticStackFile('retrieval-embeddings.json');
@@ -54,30 +72,23 @@ export function applyPackagedRetrievalDefaults(
     home?: string;
   } = {},
 ): void {
-  const hydrate = paths.hydrate ?? resolveRetrievalStackFile(
-    'retrieval-hydrate.json',
-    paths.apiOrigin,
-    paths.home,
-  );
-  const index = paths.index ?? resolveRetrievalStackFile(
-    'retrieval-index.json',
-    paths.apiOrigin,
-    paths.home,
-  );
-  const embeddings = paths.embeddings ?? resolveRetrievalStackFile(
-    'retrieval-embeddings.json',
-    paths.apiOrigin,
-    paths.home,
-  );
-  const preference = paths.preference ?? resolveRetrievalStackFile(
-    'retrieval-preference.json',
-    paths.apiOrigin,
-    paths.home,
-  );
+  const hydrate = paths.hydrate ?? stackPath('retrieval-hydrate.json', paths);
+  const index = paths.index ?? stackPath('retrieval-index.json', paths);
+  const embeddings = paths.embeddings ?? stackPath('retrieval-embeddings.json', paths);
+  const preference = paths.preference ?? stackPath('retrieval-preference.json', paths);
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_HYDRATE_INDEX', hydrate, Boolean(paths.apiOrigin));
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_RETRIEVAL_INDEX', index, Boolean(paths.apiOrigin));
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_EMBEDDING_INDEX', embeddings, Boolean(paths.apiOrigin));
   assignRetrievalEnv(env, 'CUSTOMER_AGENT_RETRIEVAL_PREFERENCE', preference, Boolean(paths.apiOrigin));
+}
+
+function stackPath(
+  name: string,
+  paths: { apiOrigin?: string; home?: string },
+): string {
+  return paths.apiOrigin
+    ? seedOriginKeyedStackFile(name, paths.apiOrigin, paths.home)
+    : resolveRetrievalStackFile(name, undefined, paths.home);
 }
 
 function assignRetrievalEnv(

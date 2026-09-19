@@ -12,6 +12,7 @@ All notable changes to this customer-agent product implementation repository are
 - Off-repo hydrate and BM25 files are keyed by API origin, same hash as the session file. A leftover unkeyed catalog is still used until the keyed file exists. See `docs/plans/2026-09-19-p7-origin-keyed-retrieval.md`.
 - Answer embeddings use the same origin-keyed path. See `docs/plans/2026-09-19-p7-origin-keyed-embeddings.md`.
 - The smart-retrieval preference file is origin-keyed and loaded after packaged retrieval defaults, not at import time. See `docs/plans/2026-09-19-p7-origin-keyed-preference.md`.
+- Product mode copies a leftover unkeyed catalog into the origin-keyed path once, then writes only the keyed file. See `docs/plans/2026-09-19-p7-seed-keyed-catalog.md`.
 
 ## [0.3.3] - 2026-09-18
 
