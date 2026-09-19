@@ -2,12 +2,16 @@ import { BrowserWindow, ipcMain, session, shell, type Event } from 'electron';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { productOrigin, ProductHttpError } from './product-http';
+import { desktopFetch } from './desktop-fetch.ts';
+import { applySessionSecurity } from './window-security.ts';
 import { loadRenderer } from './overlay-renderer-loader';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import type { LoginWindow } from './product-session';
 import type { LoginWindowCommandResult } from '../shared/login-window';
 
 const FEISHU_AUTHORIZE_HOST = 'accounts.feishu.cn';
+/** Password POST and callback GET go through the named tunnel on product-remote. */
+export const LOGIN_IDENTITY_TIMEOUT_MS = 15_000;
 
 export type LoginWindowHost = {
   openExternal(url: string): Promise<void>;
@@ -33,7 +37,7 @@ export function isFeishuAuthorize(url: URL): boolean {
 export function followAllowedLoginRedirects(
   providerOrigin: string,
   apiOrigin: string,
-  transport: typeof fetch = fetch,
+  transport: typeof fetch = desktopFetch,
 ): (url: string) => Promise<void> {
   const provider = productOrigin(providerOrigin);
   const api = productOrigin(apiOrigin);
@@ -59,7 +63,7 @@ export function createLoginWindow(
 ): LoginWindow {
   const provider = productOrigin(providerOrigin); const api = productOrigin(apiOrigin);
   const openExternal = host.openExternal ?? ((url: string) => shell.openExternal(url));
-  const transport = host.fetch ?? fetch;
+  const transport = host.fetch ?? desktopFetch;
   return {
     open(url, operation) {
       const signal = operation.signal;
@@ -71,8 +75,7 @@ export function createLoginWindow(
         // Isolated cookies/storage. Renderer HTML must not emit `crossorigin`
         // (see stripCrossOriginAttributes) or this partition cannot load file:// modules.
         const isolated = session.fromPartition(`synthetic-login-${randomUUID()}`);
-        isolated.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-        isolated.setPermissionCheckHandler(() => false);
+        applySessionSecurity(isolated);
         isolated.webRequest.onBeforeRequest((details, callback) => {
           try { callback({ cancel: !isChooserUrl(details.url, devServerUrl?.()) }); }
           catch { callback({ cancel: true }); }
@@ -132,7 +135,9 @@ export function createLoginWindow(
           const callback = callbackUrl(url, api, code);
           if (!callback || !allowedLoginUrl(callback, provider, api)) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           try {
-            const response = await transport(callback, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(5_000) });
+            const response = await transport(callback, {
+              method: 'GET', redirect: 'error', signal: AbortSignal.timeout(LOGIN_IDENTITY_TIMEOUT_MS),
+            });
             if (!response.ok) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
             finish();
             return { ok: true } satisfies LoginWindowCommandResult;
@@ -198,7 +203,7 @@ async function verifySyntheticPassword(
 ): Promise<string | 'invalid' | 'unavailable'> {
   try {
     const response = await transport(new URL('/password', origin), {
-      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5_000),
+      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(LOGIN_IDENTITY_TIMEOUT_MS),
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });

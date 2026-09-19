@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）：桌面可连受控 HTTPS，`product-remote` profile，API 仍绑 127.0.0.1。见 `docs/plans/2026-09-19-p4-remote-https-profile.md`、`docs/how-to-p4-remote-mac.md`。本机方案 C 已合入。未知 `open_id` 不自动建号。账号第二条隧道 / API 绑 `0.0.0.0` / 办公机实装仍未做。
+**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。第二刀（`feat/p4-account-https`）：账号 POST 走独立 HTTPS identity origin，口令服务仍 loopback；超时 15s。DNS / 第二条 ingress 按 how-to 配，本刀不改 Cloudflare。API 绑 `0.0.0.0` / 办公机实装仍未做。
 
 ### P5 · 会话未绑定后端身份
 
@@ -93,12 +93,12 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 
 **Why:** 不能假设给默认 session 加一个证书钩子就覆盖所有请求。代理、证书策略与 pinning 都必须验证**实际传输路径**。
 
-**Context:** `apps/desktop/src/main/product-http.ts:23`、`apps/desktop/src/main/product-login-window.ts:21`。
+**Context:** `apps/desktop/src/main/desktop-fetch.ts`、`product-http.ts`、`product-login-window.ts`。规格：`docs/plans/2026-09-19-p6-cert-proxy-paths.md`。
 
 **Effort:** M
 **Priority:** P3
 **Depends on:** P4
-**Status:** OPEN
+**Status:** OPEN · 第一刀：ProductHttp / 登录 identity / MiniMax 共用 `electron.net.fetch`；登录隔离 session 走 `applySessionSecurity`。不做默认 pinning。
 
 ### P7 · 检索资产的交付路径
 
@@ -147,7 +147,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P3 或 P4
-**Status:** P3 段不适用主链 · P4 段仍 OPEN
+**Status:** P3 段不适用主链。P4 `product-remote` 适用但 **未观察**；清单见 `docs/how-to-verify-macos-m5.md` §7.1 与 `docs/plans/2026-09-19-p9-remote-m5.md`。本刀不把 M5 标完成，不授权再打包。
 
 ### Overlay · Windows 收起后交还前台输入框
 
