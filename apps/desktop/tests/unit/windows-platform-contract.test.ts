@@ -103,7 +103,8 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(remoteLinux).toContain('账号');
     expect(remoteLinux).not.toMatch(/内部|外包/);
     expect(remoteLinux).toContain('~/.config/客服话术浮窗 Demo/synthetic-stack.json');
-    expect(remoteLinux).toContain('没有与 `package:win` / `package:mac:local` 对等的 Linux UNSIGNED 产物脚本');
+    expect(remoteLinux).toContain('package:linux');
+    expect(remoteLinux).toContain('必须在 **Linux** 上跑');
   });
 
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {

@@ -1,0 +1,77 @@
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { afterEach, describe, expect, it } from 'vitest';
+import { resetLinuxPackageOutput } from '../../scripts/package-linux.mjs';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const repositoryRoot = path.resolve(root, '../..');
+const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+  scripts: Record<string, string>;
+  build: {
+    extraResources: Array<{ from: string; to: string }>;
+    linux: {
+      icon: string;
+      target: Array<{ target: string; arch: string[] }>;
+      artifactName: string;
+    };
+  };
+};
+const rootPackageJson = JSON.parse(
+  readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'),
+) as { scripts: Record<string, string> };
+const packageLinuxSource = readFileSync(path.join(root, 'scripts/package-linux.mjs'), 'utf8');
+const howTo = readFileSync(
+  path.join(repositoryRoot, 'docs/how-to-linux-packaged-product-remote.md'),
+  'utf8',
+);
+const directories: string[] = [];
+
+afterEach(() => {
+  for (const directory of directories.splice(0)) {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+describe('Linux local-unsigned packaging contract', () => {
+  it('keeps package:linux as local-unsigned only and isolated from Windows/mac output', () => {
+    expect(packageJson.scripts['package:linux']).toBe('node scripts/package-linux.mjs local');
+    expect(packageJson.scripts['package:linux:distribution']).toBeUndefined();
+    expect(rootPackageJson.scripts['package:linux']).toBe(
+      'pnpm --filter @customer-agent/desktop package:linux',
+    );
+    expect(packageJson.build.linux.icon).toBe('build/icon.png');
+    expect(packageJson.build.linux.target).toEqual([{ target: 'AppImage', arch: ['x64'] }]);
+    expect(packageJson.build.linux.artifactName).toContain('UNSIGNED');
+    expect(JSON.stringify(packageJson.build)).not.toMatch(/postgres|postgresql|pg15|apps\/api/i);
+  });
+
+  it('builds only on Linux, never as a signed distribution', async () => {
+    const moduleUrl = pathToFileURL(path.join(root, 'scripts/package-linux.mjs')).href;
+    const { packageLinux } = await import(moduleUrl);
+    expect(() => packageLinux('distribution')).toThrow(/local-unsigned only/);
+    expect(() => packageLinux('local', { platform: 'darwin' })).toThrow(/must be built on Linux/);
+    expect(packageLinuxSource).toContain("LINUX_LOCAL_UNSIGNED_OUTPUT = 'release/local-unsigned/linux'");
+    expect(packageLinuxSource).toContain("CSC_IDENTITY_AUTO_DISCOVERY = 'false'");
+    expect(packageLinuxSource).toContain('--linux');
+    expect(packageLinuxSource).toContain('scripts/verify-linux-package.mjs');
+    expect(packageLinuxSource).not.toContain('release/distribution');
+    expect(howTo).toContain('package:linux');
+    expect(howTo).toContain('必须在 **Linux** 上');
+  });
+
+  it('cleans only release/local-unsigned/linux and keeps sibling artifacts', () => {
+    const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'linux-package-root-'));
+    directories.push(fixtureRoot);
+    const linuxOutput = path.join(fixtureRoot, 'release', 'local-unsigned', 'linux');
+    const siblingOutput = path.join(fixtureRoot, 'release', 'local-unsigned', 'windows');
+    mkdirSync(linuxOutput, { recursive: true });
+    mkdirSync(siblingOutput, { recursive: true });
+    writeFileSync(path.join(linuxOutput, 'stale.AppImage'), 'stale');
+    writeFileSync(path.join(siblingOutput, 'preserve.txt'), 'preserve');
+    expect(resetLinuxPackageOutput(fixtureRoot)).toBe(linuxOutput);
+    expect(existsSync(linuxOutput)).toBe(false);
+    expect(readFileSync(path.join(siblingOutput, 'preserve.txt'), 'utf8')).toBe('preserve');
+  });
+});

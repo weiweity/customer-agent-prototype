@@ -40,4 +40,4 @@ P10 userData 中间的 `feat/p10-desktop-userdata-path`、`feat/p10-m5-userdata-
 - 多公司 PG 分库
 - NSPanel native
 - 包内 PostgreSQL
-- 对等的 `package:linux` UNSIGNED 脚本
+- 在 Linux 实机跑 `package:linux` 并勾选远端主链

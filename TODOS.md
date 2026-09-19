@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。打包态远端勾选（未观察）：macOS / Windows 办公机 / Linux（Linux 无对等 UNSIGNED 脚本）。账号第二条隧道 / API 绑 `0.0.0.0` 仍未做。
+**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。打包态远端勾选（未观察）：macOS / Windows 办公机 / Linux。`package:linux` 须在 Linux 上跑。账号第二条隧道 / API 绑 `0.0.0.0` 仍未做。
 
 ### P5 · 会话未绑定后端身份
 
@@ -134,7 +134,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P1
 **Depends on:** P2
-**Status:** OPEN · 包内后端仍不做。P10/how-to 线尖端 `feat/linux-packaged-remote-howto`。合入顺序见 `docs/plans/2026-09-19-local-unpushed-merge-order.md`。
+**Status:** OPEN · 包内后端仍不做。`package:linux` 第一刀：Linux 上 local-unsigned AppImage。见 `docs/plans/2026-09-19-p10-package-linux-local.md`。
 
 ### P9 · M5 受影响项在新 profile 下需重验
 

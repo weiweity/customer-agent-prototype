@@ -22,6 +22,7 @@
     "preview": "electron-vite preview",
     "test:e2e": "pnpm build && playwright test",
     "package:win": "node scripts/package-windows.mjs local",
+    "package:linux": "node scripts/package-linux.mjs local",
     "package:mac:local": "node scripts/package-macos.mjs local",
     "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution"
   },
@@ -137,6 +138,19 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
       "differentialPackage": false
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Office",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-linux-${arch}-UNSIGNED.${ext}"
     }
   }
 }

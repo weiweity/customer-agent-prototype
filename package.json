@@ -55,6 +55,7 @@
     "clean:deep:preview": "node scripts/workspace-hygiene.mjs clean --scope=deep",
     "clean:deep": "node scripts/workspace-hygiene.mjs clean --scope=deep --apply",
     "package:win": "pnpm --filter @customer-agent/desktop package:win",
+    "package:linux": "pnpm --filter @customer-agent/desktop package:linux",
     "package:mac:local": "pnpm --filter @customer-agent/desktop package:mac:local",
     "package:mac": "pnpm --filter @customer-agent/desktop package:mac",
     "build:services": "pnpm --filter @customer-agent/contracts build && pnpm --filter @customer-agent/database build && pnpm --filter @customer-agent/api build",
