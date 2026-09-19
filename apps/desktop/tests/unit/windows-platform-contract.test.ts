@@ -57,6 +57,11 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(verifyDesktop).toContain('~/.config/客服话术浮窗 Demo/');
     expect(p4).toContain('%APPDATA%\\客服话术浮窗 Demo\\synthetic-stack.json');
     expect(p4).toContain('~/.config/客服话术浮窗 Demo/synthetic-stack.json');
+    const m5 = readFileSync(path.join(repositoryRoot, 'docs/how-to-verify-macos-m5.md'), 'utf8');
+    expect(m5).toContain('~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json');
+    expect(m5).toContain('%APPDATA%');
+    expect(m5).toContain('~/.config');
+    expect(m5).toContain('不把那些路径记成本节通过');
   });
 
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {

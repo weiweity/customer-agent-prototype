@@ -12,6 +12,7 @@ All notable changes to this customer-agent product implementation repository are
 - The synthetic stack writes `synthetic-stack.json` to the Electron userData directory on Windows and Linux, not only macOS Application Support. See `docs/plans/2026-09-19-p10-desktop-userdata-path.md`.
 - How-tos for stack start and product-remote packaged profile include the Windows `%APPDATA%` userData path. See `docs/plans/2026-09-19-p10-userdata-docs.md`.
 - How-tos also name the Linux `~/.config` userData path. See `docs/plans/2026-09-19-p10-linux-userdata-docs.md`.
+- macOS M5 notes Windows/Linux userData paths without treating them as a pass. See `docs/plans/2026-09-19-p10-m5-userdata-note.md`.
 
 ## [0.3.3] - 2026-09-18
 
