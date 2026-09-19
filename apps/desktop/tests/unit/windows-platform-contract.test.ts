@@ -39,6 +39,7 @@ const verifyWindowsPackage = readFileSync(
   path.join(root, 'scripts/verify-windows-package.mjs'),
   'utf8',
 );
+const overlayController = readFileSync(path.join(root, 'src/main/overlay-controller.ts'), 'utf8');
 const readme = readFileSync(path.join(repositoryRoot, 'README.md'), 'utf8');
 const developmentBrief = readFileSync(path.join(repositoryRoot, 'DEVELOPMENT_BRIEF.md'), 'utf8');
 const stackProfile = readFileSync(
@@ -115,6 +116,9 @@ describe('Windows local-unsigned packaging contract', () => {
       from: 'build/icon.ico',
       to: 'icon.ico',
     });
+    expect(JSON.stringify(packageJson.build)).not.toMatch(
+      /postgres|postgresql|pg15|apps\/api|synthetic-stack\/stack/i,
+    );
     expect(packageJson.build.win.certificateFile).toBeUndefined();
     expect(packageJson.build.win.certificateSha1).toBeUndefined();
     expect(packageJson.build.win.artifactName).toContain('-UNSIGNED.');
@@ -164,6 +168,13 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(verifyWindowsPackage).toContain('Chromium-LICENSES.html');
     expect(verifyWindowsPackage).toContain('assertPackagedOfflineProfile');
     expect(verifyWindowsPackage).toContain('does not inspect the PE executable icon resource');
+  });
+
+  it('yields the previous Windows app without stealing focus', () => {
+    expect(overlayController).toContain('yieldWindowsForeground');
+    expect(overlayController).toContain('fox.hide()');
+    expect(overlayController).not.toMatch(/app\.focus\([^)]*steal/);
+    expect(overlayController).toContain("process.platform === 'win32'");
   });
 
   it('documents the unsigned fact and forbids presenting the local artifact as a signed release', () => {
