@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -173,6 +173,25 @@ describe('packaged retrieval defaults', () => {
     expect(readFileSync(unkeyed, 'utf8')).toBe('{"releaseId":"rel-unkeyed"}\n');
     applyPackagedRetrievalDefaults(env, { apiOrigin: origin, home });
     expect(readFileSync(keyed, 'utf8')).toBe('{"releaseId":"rel-keyed"}\n');
+  });
+
+  it('does not abort startup when seeding a keyed catalog cannot copy', () => {
+    const home = mkdtempSync(path.join(tmpdir(), 'packaged-retrieval-seed-fail-'));
+    directories.push(home);
+    const stack = path.join(home, '.customer-agent-synthetic-stack');
+    mkdirSync(stack);
+    const origin = 'https://agent-auth.jianghua.site';
+    writeFileSync(defaultSyntheticStackFile('retrieval-hydrate.json', home), '{"releaseId":"rel-unkeyed"}\n');
+    chmodSync(stack, 0o500);
+    try {
+      const env: NodeJS.ProcessEnv = {};
+      expect(() => applyPackagedRetrievalDefaults(env, { apiOrigin: origin, home })).not.toThrow();
+      const keyed = originKeyedStackFile('retrieval-hydrate.json', origin, home);
+      expect(env.CUSTOMER_AGENT_HYDRATE_INDEX).toBe(keyed);
+      expect(existsSync(keyed)).toBe(false);
+    } finally {
+      chmodSync(stack, 0o700);
+    }
   });
 
   it('points CLI write paths at origin-keyed files when the desktop API origin is set', () => {

@@ -44,8 +44,13 @@ export function seedOriginKeyedStackFile(
   const keyed = originKeyedStackFile(name, apiOrigin, home);
   const unkeyed = defaultSyntheticStackFile(name, home);
   if (!existsSync(keyed) && existsSync(unkeyed)) {
-    mkdirSync(dirname(keyed), { recursive: true });
-    copyFileSync(unkeyed, keyed);
+    try {
+      mkdirSync(dirname(keyed), { recursive: true });
+      copyFileSync(unkeyed, keyed);
+    } catch {
+      // Best-effort seed. Login persist still writes the keyed path; a copy
+      // failure must not abort packaged startup.
+    }
   }
   return keyed;
 }
