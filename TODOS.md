@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）：桌面可连受控 HTTPS，`product-remote` profile，API 仍绑 127.0.0.1。见 `docs/plans/2026-09-19-p4-remote-https-profile.md`、`docs/how-to-p4-remote-mac.md`。本机方案 C 已合入。未知 `open_id` 不自动建号。账号第二条隧道 / API 绑 `0.0.0.0` / 办公机实装仍未做。
+**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。打包态远端勾选（未观察）：`docs/how-to-macos-packaged-product-remote.md`、`docs/how-to-office-machine-product-remote.md`。账号第二条隧道 / API 绑 `0.0.0.0` 仍未做。
 
 ### P5 · 会话未绑定后端身份
 
@@ -147,7 +147,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** M
 **Priority:** P2
 **Depends on:** P3 或 P4
-**Status:** P3 段不适用主链 · P4 段仍 OPEN
+**Status:** P3 段不适用主链。P4 打包态远端清单未观察：`docs/how-to-macos-packaged-product-remote.md`。不把 M5 标完成。
 
 ### Overlay · Windows 收起后交还前台输入框
 

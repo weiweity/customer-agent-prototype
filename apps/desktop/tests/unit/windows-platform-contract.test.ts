@@ -81,6 +81,17 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(remoteOffice).toContain('%APPDATA%\\客服话术浮窗 Demo\\synthetic-stack.json');
     expect(remoteOffice).toContain('不要在办公机安装 PostgreSQL');
     expect(remoteOffice).toContain('还不能用当前 main 上的安装包当本页证据');
+    const remoteMac = readFileSync(
+      path.join(repositoryRoot, 'docs/how-to-macos-packaged-product-remote.md'),
+      'utf8',
+    );
+    expect(remoteMac).toContain('**未观察**');
+    expect(remoteMac).toContain('飞书');
+    expect(remoteMac).toContain('账号');
+    expect(remoteMac).not.toMatch(/内部|外包/);
+    expect(remoteMac).toContain('~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json');
+    expect(remoteMac).toContain('不授权现在执行 `pnpm package:mac:local`');
+    expect(remoteMac).toContain('不要把 [M5](how-to-verify-macos-m5.md) 的 `synthetic-local` 勾选抄到本页');
   });
 
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {
