@@ -39,3 +39,4 @@
 - 开发态 `pnpm dev` + export origin
 - 签名、公证、外发
 - [办公机 Windows 远端页](how-to-office-machine-product-remote.md)
+- [Linux 打包态远端页](how-to-linux-packaged-product-remote.md)

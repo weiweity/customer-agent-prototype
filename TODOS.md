@@ -72,7 +72,7 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Effort:** L
 **Priority:** P2
 **Depends on:** P2 + 独立安全评审
-**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。打包态远端勾选（未观察）：`docs/how-to-macos-packaged-product-remote.md`、`docs/how-to-office-machine-product-remote.md`。账号第二条隧道 / API 绑 `0.0.0.0` 仍未做。
+**Status:** OPEN · 第一刀已合入（#133 / `4cdac71`）。打包态远端勾选（未观察）：macOS / Windows 办公机 / Linux（Linux 无对等 UNSIGNED 脚本）。账号第二条隧道 / API 绑 `0.0.0.0` 仍未做。
 
 ### P5 · 会话未绑定后端身份
 

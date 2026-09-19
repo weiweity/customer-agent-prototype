@@ -92,6 +92,16 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(remoteMac).toContain('~/Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json');
     expect(remoteMac).toContain('不授权现在执行 `pnpm package:mac:local`');
     expect(remoteMac).toContain('不要把 [M5](how-to-verify-macos-m5.md) 的 `synthetic-local` 勾选抄到本页');
+    const remoteLinux = readFileSync(
+      path.join(repositoryRoot, 'docs/how-to-linux-packaged-product-remote.md'),
+      'utf8',
+    );
+    expect(remoteLinux).toContain('**未观察**');
+    expect(remoteLinux).toContain('飞书');
+    expect(remoteLinux).toContain('账号');
+    expect(remoteLinux).not.toMatch(/内部|外包/);
+    expect(remoteLinux).toContain('~/.config/客服话术浮窗 Demo/synthetic-stack.json');
+    expect(remoteLinux).toContain('没有与 `package:win` / `package:mac:local` 对等的 Linux UNSIGNED 产物脚本');
   });
 
   it('keeps package:win as an explicit UNSIGNED local proof, isolated from distribution', () => {

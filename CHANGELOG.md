@@ -16,6 +16,7 @@ All notable changes to this customer-agent product implementation repository are
 - Local unpushed branches have a merge-order note: keep the origin-keyed P7 stack, drop the earlier retrieval-delivery line. See `docs/plans/2026-09-19-local-unpushed-merge-order.md`.
 - Office-machine product-remote checklist exists and stays **未观察** until a new UNSIGNED build after P4/P7 lands. See `docs/how-to-office-machine-product-remote.md`.
 - macOS packaged product-remote checklist exists and stays **未观察**. See `docs/how-to-macos-packaged-product-remote.md`.
+- Linux packaged product-remote checklist exists, stays **未观察**, and states there is no `package:linux` counterpart. See `docs/how-to-linux-packaged-product-remote.md`.
 
 ## [0.3.3] - 2026-09-18
 

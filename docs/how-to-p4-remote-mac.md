@@ -32,4 +32,4 @@ pnpm --filter @customer-agent/desktop dev
 
 `synthetic-local` 仍只接受 loopback。会话文件按 API origin 分开，不会把本机 token 发到远端。
 
-打包态远端主链勾选（全部未观察，须新包）：[macOS](how-to-macos-packaged-product-remote.md) · [办公机 Windows](how-to-office-machine-product-remote.md)。
+打包态远端主链勾选（全部未观察，须新包）：[macOS](how-to-macos-packaged-product-remote.md) · [办公机 Windows](how-to-office-machine-product-remote.md) · [Linux](how-to-linux-packaged-product-remote.md)（无对等打包脚本）。

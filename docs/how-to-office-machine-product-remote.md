@@ -40,3 +40,5 @@
 - 开发机 unit / CI 绿
 - 首轮离线勾选
 - Authenticode、M5 设备清单、包内 PostgreSQL
+- [macOS 打包态远端页](how-to-macos-packaged-product-remote.md)
+- [Linux 打包态远端页](how-to-linux-packaged-product-remote.md)
