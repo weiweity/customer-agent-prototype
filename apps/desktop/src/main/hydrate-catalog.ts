@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProductCandidate } from '../shared/product-search';
 import type { RankedRetrieval, RetrievalScript } from '../shared/hybrid-retrieve';
-import { assertOffRepoIndexPath } from './retrieval-index-store.ts';
+import { assertOffRepoIndexPath, syncRetrievalIndexFromSnapshot } from './retrieval-index-store.ts';
 import { DEFAULT_HYDRATE_INDEX_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 
 export type HydrateCatalog = Readonly<{
@@ -169,6 +169,12 @@ function parseSnapshotRow(item: object, releaseId: string): SnapshotRow | null {
 }
 
 function snapshotItemToObject(item: HydrateSnapshotItem): object {
+  const questions: string[] = [];
+  for (const question of item.questions ?? []) {
+    if (typeof question.question_text === 'string' && question.question_text.trim().length > 0) {
+      questions.push(question.question_text.trim());
+    }
+  }
   return {
     scriptId: item.script_id,
     scriptVersion: item.script_version,
@@ -187,6 +193,8 @@ function snapshotItemToObject(item: HydrateSnapshotItem): object {
     riskCategories: item.risk_categories,
     hasConflict: item.has_conflict,
     placeholderKeys: item.placeholder_keys,
+    questionText: questions[0] ?? '',
+    questions,
   };
 }
 
@@ -250,6 +258,7 @@ function serializeHydrateDocument(
       hasConflict: row.hasConflict,
       placeholderKeys: [...row.placeholderKeys],
       questionText,
+      questions: [...row.questions],
     })),
   })}\n`;
 }
@@ -339,15 +348,36 @@ export function persistHydrateFromEnv(
   releaseId: string,
   items: readonly HydrateSnapshotItem[],
 ): SyncHydrateResult | null {
-  const indexPath = (process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
-  if (indexPath.length === 0) return null;
+  const hydratePath = (process.env.CUSTOMER_AGENT_HYDRATE_INDEX ?? '').trim();
+  if (hydratePath.length === 0) return null;
   try {
-    return syncHydrateCatalog({
-      path: indexPath,
-      repoRoot: desktopRepoRoot(),
+    const repoRoot = desktopRepoRoot();
+    const hydrate = syncHydrateCatalog({
+      path: hydratePath,
+      repoRoot,
       releaseId,
       items,
     });
+    const retrievalPath = (process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX ?? '').trim();
+    let indexWrote = false;
+    if (retrievalPath.length > 0) {
+      try {
+        const index = syncRetrievalIndexFromSnapshot({
+          path: retrievalPath,
+          repoRoot,
+          releaseId,
+          items,
+        });
+        indexWrote = index.wrote;
+      } catch {
+        // Index persist is best-effort. Hydrate remains the copy SoR; BM25 can
+        // use hydrate.retrievalScripts() when the index file is missing.
+      }
+    }
+    if (indexWrote && !hydrate.wrote) {
+      return Object.freeze({ ...hydrate, wrote: true, skipped: false, reason: 'wrote' as const });
+    }
+    return hydrate;
   } catch {
     return null;
   }
