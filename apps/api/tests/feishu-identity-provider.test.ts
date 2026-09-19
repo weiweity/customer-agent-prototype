@@ -28,6 +28,12 @@ function statusResponse(status: number, url: string) {
   return response;
 }
 
+function redirectResponse(location: string, url: string) {
+  const response = new Response('', { status: 302, headers: { location } });
+  Object.defineProperty(response, 'url', { value: url });
+  return response;
+}
+
 afterEach(() => {
   persistOperatorDisplayName.mockReset();
   vi.unstubAllGlobals();
@@ -63,7 +69,7 @@ describe('feishu identity provider', () => {
         return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
       }
       if (url === FEISHU_USER_INFO_URL) {
-        expect(init?.redirect).toBe('follow');
+        expect(init?.redirect).toBe('manual');
         expect(init?.headers).toMatchObject({ authorization: 'Bearer user-access-token' });
         return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, FEISHU_USER_INFO_URL);
       }
@@ -190,6 +196,92 @@ describe('feishu identity provider', () => {
     const provider = createFeishuIdentityProvider(config, fetchImpl);
     try {
       await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
+    } finally { provider.close(); }
+  });
+
+  it('follows one allowlisted user_info hop and keeps the bearer token', async () => {
+    const hopped = `${FEISHU_USER_INFO_URL}?via=accounts`;
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url === FEISHU_TOKEN_URL) {
+        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
+      }
+      if (url === FEISHU_USER_INFO_URL) {
+        expect(init?.redirect).toBe('manual');
+        return redirectResponse(hopped, FEISHU_USER_INFO_URL);
+      }
+      if (url === hopped) {
+        expect(init?.redirect).toBe('error');
+        expect(init?.headers).toMatchObject({ authorization: 'Bearer user-access-token' });
+        return jsonResponse({ code: 0, data: { open_id: openId } }, hopped);
+      }
+      throw new Error(`unexpected ${url}`);
+    }) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      expect(await provider.exchange('one-time-code')).toBe(openId);
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    } finally { provider.close(); }
+  });
+
+  it('does not follow a user_info hop off Feishu', async () => {
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      if (String(input) === FEISHU_TOKEN_URL) {
+        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
+      }
+      return redirectResponse('https://example.com/stolen', FEISHU_USER_INFO_URL);
+    }) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally { provider.close(); }
+  });
+
+  it('reads a delayed response body after the request timer is cleared', async () => {
+    const payload = new TextEncoder().encode(JSON.stringify({
+      code: 0, token_type: 'Bearer', access_token: 'user-access-token',
+    }));
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input) === FEISHU_TOKEN_URL) {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            queueMicrotask(() => {
+              controller.enqueue(payload);
+              controller.close();
+            });
+          },
+        });
+        const response = new Response(stream, { status: 200, headers: { 'content-type': 'application/json' } });
+        Object.defineProperty(response, 'url', { value: FEISHU_TOKEN_URL });
+        return response;
+      }
+      return jsonResponse({ code: 0, data: { open_id: openId } }, FEISHU_USER_INFO_URL);
+    }) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      expect(await provider.exchange('one-time-code')).toBe(openId);
+    } finally { provider.close(); }
+  });
+
+  it('retries a user_info TypeError once', async () => {
+    let userInfoCalls = 0;
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      if (String(input) === FEISHU_TOKEN_URL) {
+        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
+      }
+      userInfoCalls += 1;
+      if (userInfoCalls === 1) {
+        const error = new TypeError('fetch failed');
+        Object.assign(error, { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } });
+        throw error;
+      }
+      return jsonResponse({ code: 0, data: { open_id: openId } }, FEISHU_USER_INFO_URL);
+    }) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider(config, fetchImpl);
+    try {
+      expect(await provider.exchange('one-time-code')).toBe(openId);
+      expect(userInfoCalls).toBe(2);
     } finally { provider.close(); }
   });
 
